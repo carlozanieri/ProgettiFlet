@@ -1,0 +1,155 @@
+Per iniziare a prendere confidenza e fare dei test di funzionalità con flet ho realizzato una pagina che espone le immagini dello slider.
+Funziona tutto  su desktop, web e android, anche se, su smartphone le immagini vengono tagliate.
+Se ti passo in ordine: api.py, main.py e sliders.py, mi aiuti a realizzarle in modo responsive?
+
+- api.py:
+
+API_BASE = "https://json.casabaldini.eu/api/v1"
+IMG_BASE = "https://json.casabaldini.eu/static/img"
+
+
+- main.py:
+
+import flet as ft
+from sliders import build_sliders
+
+async def main(page: ft.Page):
+    page.title = "CasaBaldini"
+    page.theme_mode = ft.ThemeMode.DARK
+
+    # DEBUG — mostra le dimensioni reali dello schermo
+    print(f"Larghezza: {page.width}, Altezza: {page.height}")
+    info = ft.Text(f"W:{page.width} H:{page.height}", size=12, color="yellow")
+    page.add(info)
+    page.update()
+
+    slider_view = await build_sliders(page, dir="index")
+    page.add(slider_view)
+    page.update()
+
+#ft.run(main)
+
+ft.run(main, view=ft.AppView.WEB_BROWSER)
+
+
+- sliders.py:
+
+import flet as ft
+import httpx
+from api import API_BASE, IMG_BASE
+
+async def build_sliders(page: ft.Page, dir: str = "index") -> ft.Column:
+    """Scarica gli slider e restituisce una Column con tutte le immagini."""
+
+    status = ft.Text("Caricamento slider...", color="orange", size=14)
+    colonna = ft.Column(
+        controls=[status],
+        scroll=ft.ScrollMode.AUTO,
+        expand=True,
+    )
+
+    try:
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(f"{API_BASE}/slider?dir={dir}")
+            response.raise_for_status()
+            data = response.json()
+
+        status.value = f"Caricati {len(data)} elementi"
+        status.color = "green"
+
+        for item in data:
+            img_url = f"{IMG_BASE}/{dir}/{item.get('img')}"
+            colonna.controls.append(
+                ft.Column(controls=[
+                    ft.Image(
+                        src=img_url,
+                        width=page.width * 0.4,
+                        height=page.height * 0.5,
+                        fit=ft.BoxFit.COVER,
+                    ),
+                    ft.Text(item.get("titolo", ""), size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text(item.get("caption", ""), size=12, color="grey"),
+                    ft.Divider(),
+
+
+                ])
+
+            )
+
+
+    except Exception as e:
+        status.value = f"ERRORE: {e}"
+        status.color = "red"
+        page.update()
+
+    return colonna
+
+
+    Perfetto, tutto bene, visione delle immagini corretta su tutte le piattaforme.
+
+    Prima di proseguire con la trasformazione in slider di quanto fatto sin qui, vorrei realizzare la homepage, di seguito ti passo la home.html creata per django, puoi ricrearle in flet?
+
+    home.html :
+
+{% extends 'beb/base.html' %}
+{% load static %}
+
+{% block title %}CasaBaldini{% endblock %}
+
+{% block content %}
+<div class="container text-center my-4">
+    <!-- Logo -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-8 col-md-6 col-lg-4">
+            <img src="{% static 'beb/img/logo.jpg' %}" class="img-fluid" alt="Logo CasaBaldini"/>
+        </div>
+    </div>
+
+    <!-- Immagine principale -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-11 col-md-10 col-lg-8">
+            <img src="{% static 'beb/img/fronte.jpg' %}" class="img-fluid" alt="CasaBaldini"/>
+        </div>
+    </div>
+</div>
+
+ <center><span style= "font-size:1em; color: #ffffff !important;; align:center; align-vertical:center;" >
+            <p  style= "font-size: 1em; color: #ffffff !important;"> Barberino di Mugello  </p>
+            <p  style= "font-size: 1em; color: #ffffff;"> 2,5 Km. dall'uscita dell'Autostrada A1  </p>
+            <p  style= "font-size: 1em; color: #ffffff;"> a pochi Km. da Firenze  </p>
+            <p  style= "font-size: 1em; color: #ffffff;"> <b>______________________________________________________ </b></p>
+
+            <p  style= "font-size: 1em; color: #ffffff;">
+
+                <b>   Per informazioni e prenotazioni telefona al +39 3207060411 </b>
+            </p>
+ </span></center>
+</div>
+{% endblock %}
+
+{% block footer %}
+<div class="container-fluid py-2" >
+    <marquee direction="right" scrollamount="7"
+             onMouseOver="this.stop()" onMouseOut="this.start()"
+             class="text-white">
+        {% for link in links %}
+            <a href="{{ link.link }}" class="text-white text-decoration-none mx-3 fw-bold">
+                <img src="{% static 'beb/img/links/' %}{{ link.img }}"
+                     width="{{ link.width }}" height="{{ link.height }}" alt=""/>
+                &nbsp; {{ link.titolo }}
+            </a>
+        {% endfor %}
+    </marquee>
+</div>
+{% endblock %}
+
+
+Prime considerazioni su Flet,
+
+è esattamente quello che cecavo:
+
+1) lo stesso, identico, codice funziona perfettamente su desktop, web, android.
+2) applicazioni scritte utilizzando solo Python, il mio linguaggio preferito, niente html o altri strani marchingegni.
+
+Se vogliamo trovare una pecca, i file apk creati sono di dimensioni notevoli, ma, si sa, non possiamo avere tutto dalla vita e considerato che siamo alla prima versione stabile, il mio plauso agli svilippatori!

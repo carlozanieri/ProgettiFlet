@@ -1,0 +1,3 @@
+flet run main.py          # desktop con hot reload
+flet run main.py --web    # web con hot reload
+flet build apk
