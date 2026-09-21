@@ -214,5 +214,15 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Django #
+*.log
+##*.pot
+*.pyc
+__pycache__
+##db.sqlite3
+build/
+casabaldini/build/apk/
+*.apk
+
 # Streamlit
 .streamlit/secrets.toml
