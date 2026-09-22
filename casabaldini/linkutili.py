@@ -58,7 +58,7 @@ async def build_linkutili(page: ft.Page, on_home) -> ft.Column:
                 padding=10,
                 border_radius=8,
                 bgcolor="#1a3a4a",
-                on_click=apri_link,
+                action=ft.OpenUrl(url, target=ft.UrlTarget.SELF),
                 ink=True,  # effetto ripple al click
             )
             links_column.controls.append(riga)

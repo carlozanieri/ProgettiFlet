@@ -1,88 +1,160 @@
+import asyncio
 import flet as ft
 import httpx
 from api import API_BASE, IMG_BASE
 
+SLIDE_INTERVAL = 4
 
-async def build_sliders(page: ft.Page, dir: str = "index") -> ft.Column:
-    """Scarica gli slider e restituisce una Column responsive con tutte le immagini."""
 
-    status = ft.Text("Caricamento slider...", color="orange", size=14)
-    colonna = ft.Column(
-        controls=[status],
-        spacing=15,
-        expand=True,
-    )
+class SliderView:
+    """Carosello personalizzato con autoplay, frecce e indicatori cliccabili."""
 
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(f"{API_BASE}/slider?dir={dir}")
-            response.raise_for_status()
-            data = response.json()
+    def __init__(self, page: ft.Page, dir_val: str, on_image_click):
+        self.page = page
+        self.dir = dir_val
+        self.on_image_click = on_image_click
+        self.slides = []
+        self.current_index = 0
+        self.attivo = True
+        self.autoplay_task = None
 
-        status.value = f"Caricati {len(data)} elementi"
-        status.color = "green"
+        self.status = ft.Text("Caricamento slider...", color="orange", size=14)
 
-        for item in data:
-            img_url = f"{IMG_BASE}/{dir}/{item.get('img')}"
+        # Immagine corrente con transizione
+        self.immagine_corrente = ft.Image(
+            src="",
+            fit=ft.BoxFit.CONTAIN,
+            expand=True,
+        )
+        self.switcher = ft.AnimatedSwitcher(
+            content=self.immagine_corrente,
+            transition=ft.AnimatedSwitcherTransition.FADE,
+            duration=500,
+            reverse_duration=500,
+            switch_in_curve=ft.AnimationCurve.EASE_IN_OUT,
+            switch_out_curve=ft.AnimationCurve.EASE_IN_OUT,
+            expand=True,
+        )
 
-            # ResponsiveRow: su schermi piccoli occupa tutto,
-            # su schermi grandi si adatta al contenitore
-            immagine = ft.Image(
-                src=img_url,
-                fit=ft.BoxFit.CONTAIN,  # mostra tutta l'immagine senza tagliarla
-                width=None,             # lascia che sia il contenitore a decidere
-                height=None,
-                expand=True,
-            )
+        # Frecce
+        self.btn_prev = ft.IconButton(
+            icon=ft.Icons.CHEVRON_LEFT,
+            icon_size=40,
+            icon_color="white",
+            on_click=lambda e: self.page.run_task(self._vai_precedente),
+        )
+        self.btn_next = ft.IconButton(
+            icon=ft.Icons.CHEVRON_RIGHT,
+            icon_size=40,
+            icon_color="white",
+            on_click=lambda e: self.page.run_task(self._vai_successivo),
+        )
 
-            # Contenitore con larghezza piena e altezza proporzionale
-            immagine_container = ft.Container(
-                content=immagine,
-                width=None,
-                height=None,
-                expand=True,
-                border_radius=8,
-                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-            )
+        # Indicatori
+        self.indicatori_row = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=8,
+        )
 
-            blocco = ft.Column(
+    async def build(self) -> ft.Column:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(f"{API_BASE}/slider", params={"dir": self.dir})
+                response.raise_for_status()
+                self.slides = response.json()
+
+            self.status.value = f"Caricati {len(self.slides)} elementi"
+
+            # Mostra la prima slide
+            if self.slides:
+                await self._mostra_slide(0)
+
+            # Avvia autoplay
+            self.autoplay_task = asyncio.create_task(self._autoplay())
+
+            # Layout: immagine + frecce + indicatori
+            return ft.Column(
                 controls=[
-                    immagine_container,
-                    ft.Text(
-                        item.get("titolo", ""),
-                        size=16,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                    ft.Text(
-                        item.get("caption", ""),
-                        size=12,
-                        color="grey",
-                    ),
-                    ft.Divider(),
-                ],
-                spacing=5,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            )
-
-            # ResponsiveRow: la colonna occupa tutta la larghezza
-            # su schermi piccoli, e può adattarsi su schermi grandi
-            riga = ft.ResponsiveRow(
-                controls=[
+                    self.status,
                     ft.Container(
-                        content=blocco,
-                        col={"xs": 12, "sm": 12, "md": 10, "lg": 8, "xl": 6},
-                        padding=5,
-                    )
+                        content=ft.Row(
+                            controls=[self.btn_prev, ft.Container(content=self.switcher, expand=True), self.btn_next],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=10,
+                        ),
+                        expand=True,
+                    ),
+                    self.indicatori_row,
                 ],
-                alignment=ft.MainAxisAlignment.CENTER,
                 spacing=10,
-                run_spacing=10,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                expand=True,
             )
 
-            colonna.controls.append(riga)
+        except Exception as e:
+            print(f"ERRORE slider: {e}")
+            import traceback
+            traceback.print_exc()
+            self.status.value = f"Errore: {e}"
+            self.status.color = "red"
+            return ft.Column([self.status])
 
-    except Exception as e:
-        status.value = f"ERRORE: {e}"
-        status.color = "red"
+    async def _mostra_slide(self, index: int):
+        if not self.slides:
+            return
+        self.current_index = index % len(self.slides)
+        slide = self.slides[self.current_index]
+        img_url = f"{IMG_BASE}/{self.dir}/{slide.get('img', '')}"
 
-    return colonna
+        # Aggiorna l'immagine nel switcher (la transizione è automatica)
+        self.switcher.content = ft.Image(
+            src=img_url,
+            fit=ft.BoxFit.CONTAIN,
+            expand=True,
+        )
+        self._aggiorna_indicatori()
+        self.page.update()
+
+    async def _vai_precedente(self):
+        await self._mostra_slide(self.current_index - 1)
+
+    async def _vai_successivo(self):
+        await self._mostra_slide(self.current_index + 1)
+
+    def _aggiorna_indicatori(self):
+        self.indicatori_row.controls.clear()
+        for i in range(len(self.slides)):
+            attivo = (i == self.current_index)
+            self.indicatori_row.controls.append(
+                ft.Container(
+                    width=14 if attivo else 10,
+                    height=14 if attivo else 10,
+                    border_radius=7,
+                    bgcolor="#043a55" if attivo else "#888888",
+                    on_click=lambda e, idx=i: self.page.run_task(self._vai_a, idx),
+                    ink=True,
+                )
+            )
+
+    async def _vai_a(self, index: int):
+        await self._mostra_slide(index)
+
+    async def _autoplay(self):
+        while self.attivo:
+            await asyncio.sleep(SLIDE_INTERVAL)
+            if self.attivo and self.slides:
+                await self._vai_successivo()
+
+    def stop(self):
+        self.attivo = False
+        if self.autoplay_task:
+            self.autoplay_task.cancel()
+            self.autoplay_task = None
+
+
+async def build_sliders(page: ft.Page, dir: str = "index", on_image_click=None) -> ft.Column:
+    slider = SliderView(page, dir, on_image_click)
+    pagina = await slider.build()
+    page._slider_attivo = slider
+    return pagina

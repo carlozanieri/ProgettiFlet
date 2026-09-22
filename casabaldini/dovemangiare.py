@@ -69,8 +69,7 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Column:
                 padding=10,
                 border_radius=8,
                 bgcolor="#1a3a4a",
-                on_click=apri_link if url else None,
-                ink=bool(url),
+                action=ft.OpenUrl(url, target=ft.UrlTarget.SELF),
             )
             ristoranti_column.controls.append(riga)
 
