@@ -2,7 +2,9 @@ import flet as ft
 from menu import build_menu
 from home import build_home
 from sliders import build_sliders
-
+from linkutili import build_linkutili
+from dovemangiare import build_dovemangiare
+from prenotazioni import build_prenotazioni
 
 async def main(page: ft.Page):
     page.title = "CasaBaldini"
@@ -16,6 +18,10 @@ async def main(page: ft.Page):
     # Area contenuto
     content_area = ft.Column(controls=[], expand=True, scroll=ft.ScrollMode.AUTO)
     page.add(content_area)
+
+    async def home_callback():
+        """Naviga verso la home"""
+        await navigate({"link": "/", "tipopage": "interna", "titolo": "Home"})
 
     # ==================== NAVIGATORE ====================
     async def navigate(voce: dict):
@@ -39,12 +45,28 @@ async def main(page: ft.Page):
             elif link.startswith("/casabaldini/"):
                 dir_val = link.split("/")[-1]
                 view = await build_sliders(page, dir=dir_val)
+            elif link == "/linkutili":
+                view = await build_linkutili(page, on_home=home_callback)
+                content_area.controls.clear()
+                content_area.controls.append(view)
+            elif tipopage == "modale":
+                if "prenotazioni" in link:
+                    view = await build_prenotazioni(page, on_home=home_callback)
+                elif "dovemangiare" in link:
+                    view = await build_dovemangiare(page, on_home=home_callback)
+                else:
+                    view = ft.Container(
+                        content=ft.Text(f"Modale: {titolo} ({link})", color="white", size=16),
+                        padding=20,
+                    )
+                content_area.controls.clear()
+                content_area.controls.append(view)
             else:
                 view = ft.Container(
                     content=ft.Text(f"Pagina: {titolo} ({link})", color="white", size=16),
                     padding=20,
                 )
-
+            
             content_area.controls.clear()
             content_area.controls.append(view)
             page.update()

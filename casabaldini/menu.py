@@ -60,6 +60,8 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
 
 async def _on_click(page: ft.Page, voce: dict, on_navigate):
     """Chiude il drawer e delega la navigazione alla callback."""
-    page.drawer.open = False
-    page.update()
+    try:
+        await page.close_drawer()
+    except Exception as e:
+        print(f"Errore chiusura drawer: {e}")
     await on_navigate(voce)
