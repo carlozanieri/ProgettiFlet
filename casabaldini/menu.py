@@ -1,6 +1,5 @@
 import flet as ft
-import httpx
-from api import API_BASE
+from api import fetch_menu
 
 
 async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
@@ -8,26 +7,22 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
 
     menu_data = []
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(f"{API_BASE}/menu")
-            response.raise_for_status()
-            menu_data = response.json()
+        menu_data = await fetch_menu()
+        print(f"DEBUG menu_data: {len(menu_data)} voci ricevute")
     except Exception as e:
-        print(f"Errore caricamento menu: {e}")
+        print(f"ERRORE caricamento menu: {e}")
 
     voci = []
-
     for voce in menu_data:
         parent = voce.get("parent", {})
         children = voce.get("children", [])
         titolo_padre = parent.get("titolo", "")
 
-        # Sottovoci
         sottovoci = []
         for child in children:
             sottovoci.append(
                 ft.ListTile(
-                    title=ft.Text(child.get("titolo", "")),
+                    title=ft.Text(child.get("titolo", ""), color="white"),
                     on_click=lambda e, c=child: page.run_task(_on_click, page, c, on_navigate),
                 )
             )
@@ -35,7 +30,7 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
         if sottovoci:
             voci.append(
                 ft.ExpansionTile(
-                    title=ft.Text(titolo_padre, weight=ft.FontWeight.BOLD),
+                    title=ft.Text(titolo_padre, weight=ft.FontWeight.BOLD, color="white"),
                     controls=sottovoci,
                     expanded=False,
                 )
@@ -43,7 +38,7 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
         else:
             voci.append(
                 ft.ListTile(
-                    title=ft.Text(titolo_padre, weight=ft.FontWeight.BOLD),
+                    title=ft.Text(titolo_padre, weight=ft.FontWeight.BOLD, color="white"),
                     on_click=lambda e, p=parent: page.run_task(_on_click, page, p, on_navigate),
                 )
             )
@@ -51,12 +46,7 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
     drawer = ft.NavigationDrawer(
         controls=[
             ft.Container(
-                content=ft.Text(
-                    "CasaBaldini",
-                    size=22,
-                    weight=ft.FontWeight.BOLD,
-                    color="white",
-                ),
+                content=ft.Text("CasaBaldini", size=22, weight=ft.FontWeight.BOLD, color="white"),
                 padding=20,
                 bgcolor="#043a55",
             ),

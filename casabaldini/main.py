@@ -1,92 +1,70 @@
 import flet as ft
-from home import build_home
 from menu import build_menu
+from home import build_home
 from sliders import build_sliders
 
 
 async def main(page: ft.Page):
     page.title = "CasaBaldini"
-    page.theme_mode = ft.ThemeMode.DARK
+    page.bgcolor = "#000000"
     page.padding = 0
     page.scroll = ft.ScrollMode.AUTO
-    page.bgcolor = "#000000"
 
-    # Area contenuto che cambia in base alla voce di menu
-    content_area = ft.Column(
-        controls=[],
-        expand=True,
-        scroll=ft.ScrollMode.AUTO,
-    )
+    # Istanza per aprire link esterni
+    url_launcher = ft.UrlLauncher()
+
+    # Area contenuto
+    content_area = ft.Column(controls=[], expand=True, scroll=ft.ScrollMode.AUTO)
     page.add(content_area)
 
     # ==================== NAVIGATORE ====================
     async def navigate(voce: dict):
         link = voce.get("link", "")
+        titolo = voce.get("titolo", "")
         tipopage = voce.get("tipopage", "")
+        print(f"DEBUG navigate: titolo={titolo}, link={link}, tipo={tipopage}")
 
-        content_area.controls.clear()
-        content_area.controls.append(ft.ProgressRing())
+        try:
+            if tipopage == "esterna":
+                try:
+                    await url_launcher.launch_url(link)
+                except Exception as e:
+                    print(f"Errore apertura URL: {e}")
+                return
 
-        # Routing
-        if tipopage == "esterna":
-            # Apri nel browser
-            content_area.controls.clear()
-            await page.launch_url_async(link) if hasattr(page, 'launch_url_async') else None
-            # fallback
-            try:
-                launcher = ft.UrlLauncher()
-                await launcher.launch_url(link)
-            except Exception as e:
-                print(f"Errore apertura URL: {e}")
-
-        elif tipopage == "modale":
-            if "prenotazioni" in link:
-                content_area.controls.clear()
-                content_area.controls.append(ft.Text(f"Prenotazioni: {link}"))
-            elif "dovemangiare" in link:
-                content_area.controls.clear()
-                content_area.controls.append(ft.Text(f"Dove Mangiare: {link}"))
-            else:
-                content_area.controls.clear()
-                content_area.controls.append(ft.Text(f"Modale: {link}"))
-
-        elif tipopage == "interna":
             if link == "/" or link == "":
-                # Home page
                 view = await build_home(page)
-                content_area.controls.clear()
-                content_area.controls.append(view)
-
             elif link == "/casabaldini/index" or link == "/casabaldini":
-                # Slider immagini
                 view = await build_sliders(page, dir="index")
-                content_area.controls.clear()
-                content_area.controls.append(view)
-
             elif link.startswith("/casabaldini/"):
-                # Sezione con slider (camere, ilpaese, lasala)
                 dir_val = link.split("/")[-1]
                 view = await build_sliders(page, dir=dir_val)
-                content_area.controls.clear()
-                content_area.controls.append(view)
-
-            elif link == "/linkutili":
-                content_area.controls.clear()
-                content_area.controls.append(ft.Text(f"Link Utili: {link}"))
-
             else:
-                content_area.controls.clear()
-                content_area.controls.append(ft.Text(f"Pagina interna: {link}"))
+                view = ft.Container(
+                    content=ft.Text(f"Pagina: {titolo} ({link})", color="white", size=16),
+                    padding=20,
+                )
 
-        page.update()
+            content_area.controls.clear()
+            content_area.controls.append(view)
+            page.update()
 
-    # ==================== APP BAR + DRAWER ====================
+        except Exception as e:
+            print(f"ERRORE navigazione: {e}")
+            import traceback
+            traceback.print_exc()
+            content_area.controls.clear()
+            content_area.controls.append(
+                ft.Text(f"Errore: {e}", color="red", size=14)
+            )
+            page.update()
+
+    # ==================== DRAWER + APP BAR ====================
     drawer = await build_menu(page, on_navigate=navigate)
     page.drawer = drawer
 
     def apri_menu(e):
-        page.drawer.open = True
-        page.update()
+        page.run_task(page.show_drawer)
 
     page.appbar = ft.AppBar(
         leading=ft.IconButton(icon=ft.Icons.MENU, on_click=apri_menu),
@@ -94,7 +72,7 @@ async def main(page: ft.Page):
         bgcolor="#043a55",
     )
 
-    # Vista iniziale: home page
+    # ==================== VISTA INIZIALE ====================
     home_view = await build_home(page)
     content_area.controls.append(home_view)
     page.update()
