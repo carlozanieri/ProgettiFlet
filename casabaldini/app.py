@@ -8,7 +8,7 @@ from dovemangiare import build_dovemangiare
 from prenotazioni import build_prenotazioni
 from sliders import build_sliders
 from dettaglio_slider import build_dettaglio
-
+from marquee import MarqueeFooter
 
 async def main(page: ft.Page):
     page.title = "CasaBaldini"
@@ -119,6 +119,11 @@ async def main(page: ft.Page):
     # ==================== VISTA INIZIALE ====================
     home_view = await build_home(page)
     content_area.controls.append(home_view)
+    
+        # Footer marquee (fisso in fondo)
+    marquee = MarqueeFooter(page)
+    footer_view = await marquee.build()
+    page._marquee = marquee
+    page.add(ft.Container(content=footer_view, alignment=ft.Alignment.BOTTOM_CENTER))
+
     page.update()
-    # ... tutto il codice che avevi in main() ...
-pass
