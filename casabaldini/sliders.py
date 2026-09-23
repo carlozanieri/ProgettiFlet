@@ -18,7 +18,7 @@ class SliderView:
         self.attivo = True
         self.autoplay_task = None
 
-        self.status = ft.Text("Caricamento slider...", color="orange", size=14)
+        self.status = ft.Text("...", color="orange", size=14)
 
         # Immagine corrente con transizione
         self.immagine_corrente = ft.Image(
@@ -55,7 +55,16 @@ class SliderView:
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=8,
         )
-
+                # Pulsante dettaglio
+        self.btn_dettaglio = ft.Button(
+            "🔍  Dettaglio",
+            on_click=lambda e: self.page.run_task(self._click_dettaglio),
+            style=ft.ButtonStyle(
+                bgcolor="#043a55",
+                color="white",
+                padding=15,
+            ),
+        )
     async def build(self) -> ft.Column:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -63,7 +72,7 @@ class SliderView:
                 response.raise_for_status()
                 self.slides = response.json()
 
-            self.status.value = f"Caricati {len(self.slides)} elementi"
+            #self.status.value = f"Caricati {len(self.slides)} elementi"
 
             # Mostra la prima slide
             if self.slides:
@@ -86,6 +95,7 @@ class SliderView:
                         expand=True,
                     ),
                     self.indicatori_row,
+                    ft.Container(content=self.btn_dettaglio, alignment=ft.Alignment.CENTER, padding=10),
                 ],
                 spacing=10,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -152,9 +162,25 @@ class SliderView:
             self.autoplay_task.cancel()
             self.autoplay_task = None
 
+    async def _click_dettaglio(self):
+        """Apre il dettaglio della slide corrente."""
+        print(f"DEBUG _click_dettaglio: attivo={self.attivo}, on_image_click={self.on_image_click}, slides={len(self.slides) if self.slides else 0}")
+        if not self.attivo:
+            print("DEBUG: slider non attivo")
+            return
+        if self.on_image_click and self.slides:
+            idx = self.current_index
+            slide = self.slides[idx]
+            img_url = f"{IMG_BASE}/{self.dir}/{slide.get('img', '')}"
+            print(f"DEBUG: chiamo on_image_click con slide={slide.get('titolo')}, url={img_url}")
+            await self.on_image_click(slide, img_url)
+        else:
+            print(f"DEBUG: condizione fallita - on_image_click={self.on_image_click}, slides={len(self.slides) if self.slides else 0}")    
+
 
 async def build_sliders(page: ft.Page, dir: str = "index", on_image_click=None) -> ft.Column:
     slider = SliderView(page, dir, on_image_click)
     pagina = await slider.build()
     page._slider_attivo = slider
     return pagina
+

@@ -27,9 +27,21 @@ async def main(page: ft.Page):
  
      # ==================== CALLBACK DETTAGLIO ====================
     async def apri_dettaglio(slide, img_url):
+        print(f"DEBUG apri_dettaglio: slide={slide.get('titolo')}, img={img_url}")
         ferma_slider()
-        # Salva la voce corrente per poter tornare indietro
-    page._voce_corrente = getattr(page, "_voce_corrente", None)
+        page._voce_corrente = getattr(page, "_voce_corrente", None)
+
+        async def torna_indietro():
+            voce = getattr(page, "_voce_corrente", None)
+            if voce:
+                await navigate(voce)
+
+        vista = await build_dettaglio(page, slide, img_url, on_back=torna_indietro)
+        print(f"DEBUG apri_dettaglio: vista costruita, tipo={type(vista)}")
+        content_area.controls.clear()
+        content_area.controls.append(vista)
+        page.update()
+        print(f"DEBUG apri_dettaglio: content_area aggiornata")
  
     async def torna_indietro():
         # Ricostruisce lo slider della stessa sezione
