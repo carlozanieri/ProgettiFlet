@@ -1,3 +1,9 @@
 flet run main.py          # desktop con hot reload
 flet run main.py --web    # web con hot reload
 flet build apk
+
+python main.py --mode web
+python main.py --mode desktop
+flet build apk --module-name main_android  --artifact ARTIFACT_NAME  Executable or bundle name on disk ??
+
+

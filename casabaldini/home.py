@@ -73,7 +73,7 @@ async def build_home(page: ft.Page) -> ft.Column:
     )
 
     # ==================== FOOTER LINK ====================
-    footer = await build_footer_links(page)
+    ##footer = await build_footer_links(page)
 
     # ==================== COMPOSIZIONE ====================
     home_column = ft.Column(
@@ -81,7 +81,7 @@ async def build_home(page: ft.Page) -> ft.Column:
             logo_row,
             fronte_row,
             ft.Container(content=testi, padding=20),
-            ft.Container(content=footer, padding=ft.Padding.only(top=10, bottom=10)),
+            ##ft.Container(content=footer, padding=ft.Padding.only(top=10, bottom=10)),
         ],
         spacing=20,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
