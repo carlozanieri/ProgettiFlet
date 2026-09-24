@@ -5,6 +5,10 @@ from api import API_BASE, IMG_BASE
 
 SLIDE_INTERVAL = 4
 
+# Margini per il calcolo delle dimensioni immagine
+MARGINE_ORIZZONTALE = 140   # spazio per frecce + padding
+MARGINE_VERTICALE = 220     # spazio per status, frecce, indicatori, dettaglio
+
 
 class SliderView:
     """Carosello personalizzato con autoplay, frecce e indicatori cliccabili."""
@@ -20,11 +24,16 @@ class SliderView:
 
         self.status = ft.Text("...", color="orange", size=14)
 
+        # Dimensioni immagine calcolate dalla pagina
+        self.larghezza_img = max((page.width or 800) - MARGINE_ORIZZONTALE, 200)
+        self.altezza_img = max((page.height or 600) - MARGINE_VERTICALE, 200)
+
         # Immagine corrente con transizione
         self.immagine_corrente = ft.Image(
             src="",
+            width=self.larghezza_img,
+            height=self.altezza_img,
             fit=ft.BoxFit.CONTAIN,
-            expand=True,
         )
         self.switcher = ft.AnimatedSwitcher(
             content=self.immagine_corrente,
@@ -55,7 +64,8 @@ class SliderView:
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=8,
         )
-                # Pulsante dettaglio
+
+        # Pulsante dettaglio
         self.btn_dettaglio = ft.Button(
             "🔍  Dettaglio",
             on_click=lambda e: self.page.run_task(self._click_dettaglio),
@@ -65,14 +75,13 @@ class SliderView:
                 padding=15,
             ),
         )
+
     async def build(self) -> ft.Column:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(f"{API_BASE}/slider", params={"dir": self.dir})
                 response.raise_for_status()
                 self.slides = response.json()
-
-            #self.status.value = f"Caricati {len(self.slides)} elementi"
 
             # Mostra la prima slide
             if self.slides:
@@ -87,7 +96,11 @@ class SliderView:
                     self.status,
                     ft.Container(
                         content=ft.Row(
-                            controls=[self.btn_prev, ft.Container(content=self.switcher, expand=True), self.btn_next],
+                            controls=[
+                                self.btn_prev,
+                                ft.Container(content=self.switcher, expand=True),
+                                self.btn_next,
+                            ],
                             alignment=ft.MainAxisAlignment.CENTER,
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             spacing=10,
@@ -95,7 +108,11 @@ class SliderView:
                         expand=True,
                     ),
                     self.indicatori_row,
-                    ft.Container(content=self.btn_dettaglio, alignment=ft.Alignment.CENTER, padding=10),
+                    ft.Container(
+                        content=self.btn_dettaglio,
+                        alignment=ft.Alignment.CENTER,
+                        padding=10,
+                    ),
                 ],
                 spacing=10,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -117,11 +134,12 @@ class SliderView:
         slide = self.slides[self.current_index]
         img_url = f"{IMG_BASE}/{self.dir}/{slide.get('img', '')}"
 
-        # Aggiorna l'immagine nel switcher (la transizione è automatica)
+        # Aggiorna l'immagine nel switcher con dimensioni esplicite
         self.switcher.content = ft.Image(
             src=img_url,
+            width=self.larghezza_img,
+            height=self.altezza_img,
             fit=ft.BoxFit.CONTAIN,
-            expand=True,
         )
         self._aggiorna_indicatori()
         self.page.update()
@@ -164,18 +182,13 @@ class SliderView:
 
     async def _click_dettaglio(self):
         """Apre il dettaglio della slide corrente."""
-        print(f"DEBUG _click_dettaglio: attivo={self.attivo}, on_image_click={self.on_image_click}, slides={len(self.slides) if self.slides else 0}")
         if not self.attivo:
-            print("DEBUG: slider non attivo")
             return
         if self.on_image_click and self.slides:
             idx = self.current_index
             slide = self.slides[idx]
             img_url = f"{IMG_BASE}/{self.dir}/{slide.get('img', '')}"
-            print(f"DEBUG: chiamo on_image_click con slide={slide.get('titolo')}, url={img_url}")
             await self.on_image_click(slide, img_url)
-        else:
-            print(f"DEBUG: condizione fallita - on_image_click={self.on_image_click}, slides={len(self.slides) if self.slides else 0}")    
 
 
 async def build_sliders(page: ft.Page, dir: str = "index", on_image_click=None) -> ft.Column:
@@ -183,4 +196,3 @@ async def build_sliders(page: ft.Page, dir: str = "index", on_image_click=None) 
     pagina = await slider.build()
     page._slider_attivo = slider
     return pagina
-
