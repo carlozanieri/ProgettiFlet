@@ -5,9 +5,9 @@ from api import API_BASE, IMG_BASE
 
 SLIDE_INTERVAL = 4
 
-# Margini per il calcolo delle dimensioni immagine
-MARGINE_ORIZZONTALE = 140   # spazio per frecce + padding
-MARGINE_VERTICALE = 220     # spazio per status, frecce, indicatori, dettaglio
+# Dimensioni massime per le immagini dello slider (in pixel)
+MAX_LARGHEZZA_IMG = 640
+MAX_ALTEZZA_IMG = 420
 
 
 class SliderView:
@@ -24,16 +24,11 @@ class SliderView:
 
         self.status = ft.Text("...", color="orange", size=14)
 
-        # Dimensioni immagine calcolate dalla pagina
-        self.larghezza_img = max((page.width or 800) - MARGINE_ORIZZONTALE, 200)
-        self.altezza_img = max((page.height or 600) - MARGINE_VERTICALE, 200)
-
         # Immagine corrente con transizione
         self.immagine_corrente = ft.Image(
             src="",
-            width=self.larghezza_img,
-            height=self.altezza_img,
             fit=ft.BoxFit.CONTAIN,
+            expand=True,
         )
         self.switcher = ft.AnimatedSwitcher(
             content=self.immagine_corrente,
@@ -134,12 +129,13 @@ class SliderView:
         slide = self.slides[self.current_index]
         img_url = f"{IMG_BASE}/{self.dir}/{slide.get('img', '')}"
 
-        # Aggiorna l'immagine nel switcher con dimensioni esplicite
+        # Aggiorna l'immagine nel switcher con cache_width/cache_height
         self.switcher.content = ft.Image(
             src=img_url,
-            width=self.larghezza_img,
-            height=self.altezza_img,
             fit=ft.BoxFit.CONTAIN,
+            expand=True,
+            cache_width=MAX_LARGHEZZA_IMG,
+            cache_height=MAX_ALTEZZA_IMG,
         )
         self._aggiorna_indicatori()
         self.page.update()

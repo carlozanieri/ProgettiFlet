@@ -33,7 +33,7 @@ async def build_home(page: ft.Page) -> ft.Column:
     fronte = ft.Image(
         src=f"{IMG_BASE}/index/fronte.jpg",
         fit=ft.BoxFit.CONTAIN,
-        expand=True,
+        expand=True, 
     )
 
     fronte_container = ft.Container(
