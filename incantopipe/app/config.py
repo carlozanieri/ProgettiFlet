@@ -1,4 +1,10 @@
-# /home/carlo/AreaComune/ProgettiFlet/incantopipe/app/config.py
+# app/config.py
+import os
 
-API_BASE_URL = "http://localhost:8889/api/v1"
-MEDIA_BASE_URL = "http://localhost:8889/media"
+# Legge da variabile d'ambiente, con default per sviluppo locale
+API_HOST = os.environ.get("INCANTO_API_HOST", "localhost:8889")
+
+API_BASE_URL = f"http://{API_HOST}/api/v1"
+MEDIA_BASE_URL = f"http://{API_HOST}/media"
+
+

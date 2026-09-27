@@ -1,6 +1,10 @@
-# /home/carlo/AreaComune/ProgettiFlet/incantopipe/api/config.py
+# api/config.py
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATABASE_URL = "postgresql://postgres:treX39@incantopipe.it:5432/incanto"
+
 
 API_HOST = "0.0.0.0"
 API_PORT = 8889
@@ -14,5 +18,5 @@ if PAYPAL_MODE == "sandbox":
 else:
     PAYPAL_API_URL = "https://api-m.paypal.com"
 
-# Percorso immagini del progetto Django esistente
-MEDIA_ROOT = "/home/carlo/AreaComune/progetti_py/incantopipe/media"
+# Percorso relativo: funziona ovunque tu sposti il progetto
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
