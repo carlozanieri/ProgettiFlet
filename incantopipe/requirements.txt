@@ -1,2 +1,5 @@
-flet
+ffastapi uvicorn[standard] 
+psycopg2-binary 
+pydantic 
+flet 
 httpx
