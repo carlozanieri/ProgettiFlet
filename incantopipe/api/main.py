@@ -65,9 +65,35 @@ class ProductListItem(BaseModel):
     shape: Optional[str] = None
 
 
+class CartItemAdd(BaseModel):
+    product_id: int
+    quantity: int = 1
+
+
+class CartItemUpdate(BaseModel):
+    quantity: int
+
+
+class CartItemResponse(BaseModel):
+    id: int
+    product_id: int
+    product_name: str
+    product_slug: str
+    product_image: Optional[str] = None
+    price: float
+    quantity: int
+    total: float
+
+
+class CartResponse(BaseModel):
+    cart_id: int
+    items: list[CartItemResponse]
+    total_items: int
+    total_price: float
 # ==========================
 # CONNESSIONE DATABASE
 # ==========================
+
 
 def get_db():
     """Restituisce una connessione al database PostgreSQL."""
@@ -208,6 +234,142 @@ def get_product(slug: str):
     finally:
         conn.close()
 
+# api/main.py — AGGIUNGI gli endpoint del carrello
+
+
+def get_or_create_cart(session_key: str) -> int:
+    """Ottiene o crea un carrello per la sessione corrente."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM cart_cart WHERE session_key = %s",
+                (session_key,)
+            )
+            row = cur.fetchone()
+            if row:
+                return row["id"]
+            cur.execute(
+                "INSERT INTO cart_cart (session_key, created_at, updated_at) "
+                "VALUES (%s, NOW(), NOW()) RETURNING id",
+                (session_key,)
+            )
+            cart_id = cur.fetchone()["id"]
+        conn.commit()
+        return cart_id
+    finally:
+        conn.close()
+
+
+@app.get("/api/v1/cart", response_model=CartResponse)
+def get_cart(session_key: str = Query(...)):
+    """Restituisce il carrello corrente."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM cart_cart WHERE session_key = %s", (session_key,))
+            row = cur.fetchone()
+            if not row:
+                return {"cart_id": 0, "items": [], "total_items": 0, "total_price": 0}
+            cart_id = row["id"]
+            cur.execute("""
+                SELECT ci.id, ci.product_id, ci.quantity,
+                       p.name AS product_name, p.slug AS product_slug,
+                       p.image AS product_image, p.price
+                FROM cart_cartitem ci
+                JOIN store_product p ON ci.product_id = p.id
+                WHERE ci.cart_id = %s
+                ORDER BY ci.added_at
+            """, (cart_id,))
+            items = []
+            for r in cur.fetchall():
+                item = dict(r)
+                item["price"] = float(item["price"])
+                item["total"] = item["price"] * item["quantity"]
+                items.append(item)
+            total_items = sum(i["quantity"] for i in items)
+            total_price = sum(i["total"] for i in items)
+            return {
+                "cart_id": cart_id,
+                "items": items,
+                "total_items": total_items,
+                "total_price": total_price,
+            }
+    finally:
+        conn.close()
+
+
+@app.post("/api/v1/cart/add")
+def add_to_cart(
+    session_key: str = Query(...),
+    data: CartItemAdd = ...,
+):
+    """Aggiunge un prodotto al carrello."""
+    conn = get_db()
+    try:
+        cart_id = get_or_create_cart(session_key)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, quantity FROM cart_cartitem "
+                "WHERE cart_id = %s AND product_id = %s",
+                (cart_id, data.product_id)
+            )
+            row = cur.fetchone()
+            if row:
+                cur.execute(
+                    "UPDATE cart_cartitem SET quantity = quantity + %s WHERE id = %s",
+                    (data.quantity, row["id"])
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO cart_cartitem (cart_id, product_id, quantity, added_at) "
+                    "VALUES (%s, %s, %s, NOW())",
+                    (cart_id, data.product_id, data.quantity)
+                )
+            cur.execute("UPDATE cart_cart SET updated_at = NOW() WHERE id = %s", (cart_id,))
+        conn.commit()
+        return {"success": True, "cart_id": cart_id}
+    finally:
+        conn.close()
+
+
+@app.post("/api/v1/cart/update")
+def update_cart_item(
+    session_key: str = Query(...),
+    item_id: int = Query(...),
+    data: CartItemUpdate = ...,
+):
+    """Aggiorna la quantità di un articolo."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            if data.quantity <= 0:
+                cur.execute("DELETE FROM cart_cartitem WHERE id = %s", (item_id,))
+            else:
+                cur.execute(
+                    "UPDATE cart_cartitem SET quantity = %s WHERE id = %s",
+                    (data.quantity, item_id)
+                )
+        conn.commit()
+        return {"success": True}
+    finally:
+        conn.close()
+
+
+@app.post("/api/v1/cart/remove")
+def remove_from_cart(
+    session_key: str = Query(...),
+    item_id: int = Query(...),
+):
+    """Rimuove un articolo dal carrello."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM cart_cartitem WHERE id = %s", (item_id,))
+        conn.commit()
+        return {"success": True}
+    finally:
+        conn.close()
 
 # ==========================
 # AVVIO

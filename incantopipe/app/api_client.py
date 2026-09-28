@@ -60,6 +60,56 @@ class APIClient:
         except httpx.HTTPError as e:
             print(f"Errore get_product: {e}")
             return None
+    
+    def get_cart(self, session_key: str) -> dict:
+        try:
+            r = self.client.get(
+                f"{self.base_url}/cart",
+                params={"session_key": session_key},
+            )
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPError as e:
+            print(f"Errore get_cart: {e}")
+            return {"cart_id": 0, "items": [], "total_items": 0, "total_price": 0}
+
+    def add_to_cart(self, session_key: str, product_id: int, quantity: int = 1) -> bool:
+        try:
+            r = self.client.post(
+                f"{self.base_url}/cart/add",
+                params={"session_key": session_key},
+                json={"product_id": product_id, "quantity": quantity},
+            )
+            r.raise_for_status()
+            return True
+        except httpx.HTTPError as e:
+            print(f"Errore add_to_cart: {e}")
+            return False
+
+    def update_cart_item(self, session_key: str, item_id: int, quantity: int) -> bool:
+        try:
+            r = self.client.post(
+                f"{self.base_url}/cart/update",
+                params={"session_key": session_key, "item_id": item_id},
+                json={"quantity": quantity},
+            )
+            r.raise_for_status()
+            return True
+        except httpx.HTTPError as e:
+            print(f"Errore update_cart_item: {e}")
+            return False
+
+    def remove_from_cart(self, session_key: str, item_id: int) -> bool:
+        try:
+            r = self.client.post(
+                f"{self.base_url}/cart/remove",
+                params={"session_key": session_key, "item_id": item_id},
+            )
+            r.raise_for_status()
+            return True
+        except httpx.HTTPError as e:
+            print(f"Errore remove_from_cart: {e}")
+            return False
 
     def close(self):
         self.client.close()

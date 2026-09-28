@@ -5,10 +5,8 @@ from config import MEDIA_BASE_URL
 
 
 def build_product_detail_view(
-    page: ft.Page,
-    api: APIClient,
-    slug: str,
-    on_back,
+    page: ft.Page, api: APIClient, slug: str,
+    on_back, on_add_to_cart=None,
 ) -> ft.Container:
     """Costruisce la vista di dettaglio prodotto."""
     product = api.get_product(slug)
@@ -107,21 +105,28 @@ def build_product_detail_view(
                 ft.Column([
                     unique_badge,
                     ft.Text(product["name"], size=28,
-                            weight=ft.FontWeight.BOLD),
+                        weight=ft.FontWeight.BOLD),
                     ft.Text(
                         f"€ {product['price']}",
                         size=24,
                         color=ft.Colors.BROWN_700,
                         weight=ft.FontWeight.BOLD,
                     ),
-                    ft.Divider(),
-                    ft.Text(product.get("description", ""), size=14),
-                    ft.Divider(),
-                    ft.Text("Caratteristiche", size=18,
-                            weight=ft.FontWeight.BOLD),
-                    ft.Column(specs, spacing=5),
-                ], expand=True, spacing=15),
-            ], spacing=30, vertical_alignment=ft.CrossAxisAlignment.START),
-        ], spacing=15),
-        padding=20,
-    )
+                ft.ElevatedButton(
+                    "Aggiungi al carrello",
+                    icon=ft.Icons.SHOPPING_CART,
+                    on_click=lambda e: on_add_to_cart(product["id"]) if on_add_to_cart else None,
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.BROWN_700, color=ft.Colors.WHITE),
+                    disabled=not (product.get("stock", 0) > 0),
+                ),                                          # ← virgola importante
+                ft.Divider(),
+                ft.Text(product.get("description", ""), size=14),
+                ft.Divider(),
+                ft.Text("Caratteristiche", size=18,
+                        weight=ft.FontWeight.BOLD),
+                ft.Column(specs, spacing=5),
+            ], expand=True, spacing=15),
+        ], spacing=30, vertical_alignment=ft.CrossAxisAlignment.START),
+    ], spacing=15),
+    padding=20,
+)
