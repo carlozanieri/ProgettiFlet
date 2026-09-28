@@ -71,18 +71,21 @@ def main(page: ft.Page):
         page.update()
 
     def go_checkout():
-        page.open(ft.SnackBar(content=ft.Text("Checkout in arrivo (Fase 6)")))
+        page.show_dialog(ft.SnackBar(
+    content=ft.Text("Aggiunto al carrello!"),
+    bgcolor=ft.Colors.GREEN_700,
+))
         page.update()
 
     def add_to_cart(product_id: int):
         if api.add_to_cart(session_key, product_id):
-            page.open(ft.SnackBar(
+            page.show_dialog(ft.SnackBar(
                 content=ft.Text("Aggiunto al carrello!"),
                 bgcolor=ft.Colors.GREEN_700,
             ))
             update_header()
         else:
-            page.open(ft.SnackBar(content=ft.Text("Errore nell'aggiunta")))
+            page.show_dialog(ft.SnackBar(content=ft.Text("Errore nell'aggiunta")))
         page.update()
 
     page.add(header_area, ft.Divider(), content_area)

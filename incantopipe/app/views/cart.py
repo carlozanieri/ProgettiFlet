@@ -71,7 +71,7 @@ def build_cart_view(
                             ], spacing=0),
                         ], spacing=15, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                         padding=10,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
+                        border=ft.Border.all(1, ft.Colors.GREY_300),
                         border_radius=8,
                     )
                 )
@@ -102,7 +102,7 @@ def build_cart_view(
                 total_text,
             ], alignment=ft.MainAxisAlignment.END),
             ft.Row([
-                ft.ElevatedButton(
+                ft.Button(
                     "Procedi all'ordine",
                     icon=ft.Icons.CHECK,
                     on_click=lambda e: on_checkout(),

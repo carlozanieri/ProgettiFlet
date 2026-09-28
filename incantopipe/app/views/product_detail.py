@@ -110,9 +110,8 @@ def build_product_detail_view(
                         f"€ {product['price']}",
                         size=24,
                         color=ft.Colors.BROWN_700,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                ft.ElevatedButton(
+                        weight=ft.FontWeight.BOLD,                    ),
+                ft.Button(
                     "Aggiungi al carrello",
                     icon=ft.Icons.SHOPPING_CART,
                     on_click=lambda e: on_add_to_cart(product["id"]) if on_add_to_cart else None,
