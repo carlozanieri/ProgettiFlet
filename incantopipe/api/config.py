@@ -3,7 +3,7 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATABASE_URL = "postgresql://postgres:treX39@2.24.0.173:5432/incanto"
+DATABASE_URL = "postgresql://postgres:treX39@incantopipe.it:5432/incanto"
 
 
 API_HOST = "0.0.0.0"
