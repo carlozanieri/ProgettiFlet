@@ -6,7 +6,7 @@ from api import fetch_links, IMG_BASE
 class MarqueeFooter:
     """Footer con link che scorrono orizzontalmente in modo fluido usando animate_offset."""
 
-    def __init__(self, page: ft.Page, durata_ciclo: float = 30.0):
+    def __init__(self, page: ft.Page, durata_ciclo: float = 20.0):
         self.page = page
         self.durata_ciclo = durata_ciclo  # secondi per un ciclo completo
         self.attivo = True
