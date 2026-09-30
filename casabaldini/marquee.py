@@ -4,14 +4,12 @@ from api import fetch_links, IMG_BASE
 
 
 class MarqueeFooter:
-    """Footer con link che scorrono orizzontalmente in modo continuo."""
+    """Footer con link che scorrono orizzontalmente in modo fluido usando animate_offset."""
 
-    def __init__(self, page: ft.Page, passo_px: int = 3, intervallo_ms: int = 30):
+    def __init__(self, page: ft.Page, durata_ciclo: float = 30.0):
         self.page = page
-        self.passo_px = passo_px
-        self.intervallo_ms = intervallo_ms
+        self.durata_ciclo = durata_ciclo  # secondi per un ciclo completo
         self.attivo = True
-        self.posizione = 0.0
         self.task = None
         self.fermo_hover = False
         self.fermo_tap = False
@@ -22,11 +20,15 @@ class MarqueeFooter:
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
+        # Il wrapper ha un offset animato da Flet stesso
         self.wrapper = ft.Container(
             content=self.links_row,
-            left=0,
-            top=0,
+            offset=ft.Offset(x=0, y=0),
             padding=ft.Padding.symmetric(horizontal=10, vertical=5),
+            animate_offset=ft.Animation(
+                duration=int(self.durata_ciclo * 1000),
+                curve=ft.AnimationCurve.LINEAR,
+            ),
         )
 
         self.stack = ft.Stack(
@@ -34,7 +36,6 @@ class MarqueeFooter:
             expand=True,
         )
 
-        # GestureDetector avvolge lo Stack e cattura il tocco senza bloccare i link
         self.viewport = ft.Container(
             height=60,
             bgcolor="#2c0404",
@@ -44,7 +45,6 @@ class MarqueeFooter:
             content=ft.GestureDetector(
                 content=self.stack,
                 on_tap=self._on_tap,
-                drag_interval=0,
             ),
         )
 
@@ -52,6 +52,7 @@ class MarqueeFooter:
         try:
             links_data = await fetch_links()
 
+            # Duplica i link per il loop continuo
             for _ in range(2):
                 for link in links_data:
                     titolo = link.get("titolo", "")
@@ -84,28 +85,43 @@ class MarqueeFooter:
         return self.viewport
 
     async def _anima(self):
-        await asyncio.sleep(0.5)
+        """Alterna l'offset da destra a sinistra in un ciclo continuo."""
+        await asyncio.sleep(1)
 
+        # Stima della larghezza di un giro completo
         larghezza_giro = max(200 * (len(self.links_row.controls) // 2), 1000)
 
         while self.attivo:
-            await asyncio.sleep(self.intervallo_ms / 1000.0)
-
-            if not self.attivo:
-                break
-
+            # Riprendi se in pausa
             if self.fermo_hover or self.fermo_tap:
+                await asyncio.sleep(0.1)
                 continue
 
-            self.posizione -= self.passo_px
-
-            if self.posizione <= -larghezza_giro:
-                self.posizione = 0
-
             try:
-                self.wrapper.left = self.posizione
+                # Sposta da 0 a -larghezza_giro (verso sinistra)
+                self.wrapper.offset = ft.Offset(x=-larghezza_giro, y=0)
                 self.wrapper.update()
-            except Exception:
+
+                # Attendi la durata dell'animazione
+                await asyncio.sleep(self.durata_ciclo)
+
+                if not self.attivo:
+                    break
+
+                # Reset invisibile: torna a 0 senza animazione
+                self.wrapper.animate_offset = None
+                self.wrapper.offset = ft.Offset(x=0, y=0)
+                self.wrapper.update()
+                await asyncio.sleep(0.1)
+
+                # Riattiva l'animazione
+                self.wrapper.animate_offset = ft.Animation(
+                    duration=int(self.durata_ciclo * 1000),
+                    curve=ft.AnimationCurve.LINEAR,
+                )
+
+            except Exception as e:
+                print(f"Errore animazione marquee: {e}")
                 break
 
     def _on_hover(self, e):
