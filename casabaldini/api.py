@@ -19,6 +19,7 @@ async def fetch_links():
         response.raise_for_status()
         return response.json()
 
+
 async def fetch_foods():
     """Recupera l'elenco dei ristoranti"""
     async with httpx.AsyncClient(timeout=15.0) as client:

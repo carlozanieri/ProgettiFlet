@@ -6,7 +6,7 @@ from api import fetch_links, IMG_BASE
 class MarqueeFooter:
     """Footer con link che scorrono orizzontalmente in modo continuo."""
 
-    def __init__(self, page: ft.Page, passo_px: int = 1, intervallo_ms: int = 10):
+    def __init__(self, page: ft.Page, passo_px: int = 3, intervallo_ms: int = 30):
         self.page = page
         self.passo_px = passo_px
         self.intervallo_ms = intervallo_ms
