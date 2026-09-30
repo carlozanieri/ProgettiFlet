@@ -100,7 +100,7 @@ class MarqueeFooter:
             try:
                 # Sposta da 0 a -larghezza_giro (verso sinistra)
                 self.wrapper.offset = ft.Offset(x=-larghezza_giro, y=0)
-                self.wrapper.update()
+                self.page.update()
 
                 # Attendi la durata dell'animazione
                 await asyncio.sleep(self.durata_ciclo)
@@ -111,7 +111,7 @@ class MarqueeFooter:
                 # Reset invisibile: torna a 0 senza animazione
                 self.wrapper.animate_offset = None
                 self.wrapper.offset = ft.Offset(x=0, y=0)
-                self.wrapper.update()
+                self.page.update()
                 await asyncio.sleep(0.1)
 
                 # Riattiva l'animazione
