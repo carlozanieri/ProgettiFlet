@@ -6,7 +6,7 @@ from api import fetch_links, IMG_BASE
 class MarqueeFooter:
     """Footer con link che scorrono orizzontalmente in modo fluido usando animate_offset."""
 
-    def __init__(self, page: ft.Page, durata_ciclo: float = 60.0):
+    def __init__(self, page: ft.Page, durata_ciclo: float = 90.0):
         self.page = page
         self.durata_ciclo = durata_ciclo  # secondi per un ciclo completo
         self.attivo = True
@@ -89,7 +89,7 @@ class MarqueeFooter:
         await asyncio.sleep(1)
 
         # Stima della larghezza di un giro completo
-        larghezza_giro = max(200 * (len(self.links_row.controls) // 2), 1000)
+        larghezza_giro = max(250 * (len(self.links_row.controls) // 2), 1000)
 
         while self.attivo:
             # Riprendi se in pausa
