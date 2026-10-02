@@ -22,7 +22,7 @@ async def build_home(page: ft.Page) -> ft.Column:
             ft.Container(
                 content=logo,
                 col={"xs": 4, "sm": 4, "md": 4, "lg": 2, "xl": 2},
-                padding=5,
+                padding=2,
             )
         ],
         alignment=ft.MainAxisAlignment.CENTER,
@@ -40,8 +40,8 @@ async def build_home(page: ft.Page) -> ft.Column:
         controls=[
             ft.Container(
                 content=fronte,
-                col={"xs": 8, "sm": 8, "md": 6, "lg": 5, "xl": 5},
-                padding=5,
+                col={"xs": 10, "sm": 10, "md": 8, "lg": 7, "xl": 7},
+                padding=2,
             )
         ],
         alignment=ft.MainAxisAlignment.CENTER,
@@ -50,16 +50,16 @@ async def build_home(page: ft.Page) -> ft.Column:
     # ==================== TESTI ====================
     testi = ft.Column(
         controls=[
-            ft.Text("Barberino di Mugello", size=16, color="white", text_align=ft.TextAlign.CENTER),
-            ft.Text("2,5 Km. dall'uscita dell'Autostrada A1", size=16, color="white", text_align=ft.TextAlign.CENTER),
-            ft.Text("a pochi Km. da Firenze", size=16, color="white", text_align=ft.TextAlign.CENTER),
+            ft.Text("Barberino di Mugello - 2,5 Km. dall'uscita dell'Autostrada A1 - a pochi Km. da Firenze", size=16, color="white", text_align=ft.TextAlign.CENTER),
+            #ft.Text("2,5 Km. dall'uscita dell'Autostrada A1", size=16, color="white", text_align=ft.TextAlign.CENTER),
+            #ft.Text("a pochi Km. da Firenze", size=16, color="white", text_align=ft.TextAlign.CENTER),
             ft.Text(
-                "______________________________________________________",
-                size=16, color="white", text_align=ft.TextAlign.CENTER,
+                "___________________________________________________",
+                size=15, color="white", text_align=ft.TextAlign.CENTER,
             ),
             ft.Text(
                 "Per informazioni e prenotazioni telefona al +39 3207060411",
-                size=16, color="white", weight=ft.FontWeight.BOLD,
+                size=15, color="white", weight=ft.FontWeight.BOLD,
                 text_align=ft.TextAlign.CENTER,
             ),
         ],
@@ -74,7 +74,7 @@ async def build_home(page: ft.Page) -> ft.Column:
             fronte_row,
             ft.Container(content=testi, padding=20),
         ],
-        spacing=20,
+        spacing=18,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         expand=True,
     )
