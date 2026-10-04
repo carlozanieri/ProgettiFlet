@@ -26,7 +26,7 @@ async def main(page: ft.Page):
             controls=[
                 ft.Text(
                     "CasaBaldini",
-                    size=12,
+                    size=18,
                     weight=ft.FontWeight.BOLD,
                     color="white",
                 ),
@@ -46,11 +46,23 @@ async def main(page: ft.Page):
 
     top_bar = ft.Row(
         controls=[navbar],
-        alignment=ft.MainAxisAlignment.START,  # <-- allineato a sinistra
+        alignment=ft.MainAxisAlignment.START,
+    )
+
+    # Avvolgi la navbar in un Container che rispetta la SafeArea
+    top_bar_safe = ft.Container(
+        content=ft.SafeArea(
+            content=top_bar,
+            avoid_intrusions_top=True,
+            avoid_intrusions_bottom=False,
+            avoid_intrusions_left=False,
+            avoid_intrusions_right=False,
+        ),
+        expand=False,
     )
     # ==================== CONTENUTO ====================
     content_area = ft.Column(controls=[], expand=True, scroll=ft.ScrollMode.AUTO)
-    page.add(top_bar)
+    page.add(top_bar_safe)
     page.add(content_area)
 
     # Stato per fermare l'autoplay quando si cambia vista
