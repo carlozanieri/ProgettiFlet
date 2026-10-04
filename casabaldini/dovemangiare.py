@@ -2,7 +2,7 @@ import flet as ft
 from api import fetch_foods, IMG_BASE
 
 
-async def build_dovemangiare(page: ft.Page, on_home) -> ft.Column:
+async def build_dovemangiare(page: ft.Page, on_home) -> ft.Container:
     """Costruisce la pagina Dove Mangiare."""
     url_launcher = ft.UrlLauncher()
 
@@ -39,13 +39,6 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Column:
                 descrizione += f"  {telefono}"
             if apiedi:
                 descrizione += f"  ({apiedi})"
-
-            async def apri_link(e, u=url):
-                if u:
-                    try:
-                        await url_launcher.launch_url(u)
-                    except Exception as ex:
-                        print(f"Errore apertura URL: {ex}")
 
             riga = ft.Container(
                 content=ft.Row(
@@ -98,7 +91,7 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Column:
         ),
     )
 
-    pagina = ft.Column(
+    contenuto = ft.Column(
         controls=[
             ft.Container(content=titolo, padding=20, alignment=ft.Alignment.CENTER),
             ft.Divider(height=1, color="#444444"),
@@ -111,6 +104,19 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Column:
         ],
         spacing=10,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        expand=True,
+        scroll=ft.ScrollMode.AUTO,
+    )
+
+    # Avvolgi in SafeArea per rispettare la barra di sistema in fondo
+    pagina = ft.Container(
+        content=ft.SafeArea(
+            content=contenuto,
+            avoid_intrusions_bottom=True,
+            avoid_intrusions_top=False,
+            avoid_intrusions_left=False,
+            avoid_intrusions_right=False,
+        ),
         expand=True,
     )
 

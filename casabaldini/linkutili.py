@@ -2,7 +2,7 @@ import flet as ft
 from api import fetch_links, IMG_BASE
 
 
-async def build_linkutili(page: ft.Page, on_home) -> ft.Column:
+async def build_linkutili(page: ft.Page, on_home) -> ft.Container:
     """Costruisce la pagina Link Utili.
     
     on_home è una callback per tornare alla home.
@@ -29,12 +29,6 @@ async def build_linkutili(page: ft.Page, on_home) -> ft.Column:
             url = link.get("link", "")
             img_name = link.get("img", "")
             img_url = f"{IMG_BASE}/links/{img_name}"
-
-            async def apri_link(e, u=url):
-                try:
-                    await url_launcher.launch_url(u)
-                except Exception as ex:
-                    print(f"Errore apertura URL: {ex}")
 
             riga = ft.Container(
                 content=ft.Row(
@@ -81,7 +75,7 @@ async def build_linkutili(page: ft.Page, on_home) -> ft.Column:
     )
 
     # Composizione finale
-    pagina = ft.Column(
+    contenuto = ft.Column(
         controls=[
             ft.Container(content=titolo, padding=20, alignment=ft.Alignment.CENTER),
             ft.Divider(height=1, color="#444444"),
@@ -97,6 +91,19 @@ async def build_linkutili(page: ft.Page, on_home) -> ft.Column:
         ],
         spacing=10,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        expand=True,
+        scroll=ft.ScrollMode.AUTO,
+    )
+
+    # Avvolgi in SafeArea per rispettare la barra di sistema in fondo
+    pagina = ft.Container(
+        content=ft.SafeArea(
+            content=contenuto,
+            avoid_intrusions_bottom=True,
+            avoid_intrusions_top=False,
+            avoid_intrusions_left=False,
+            avoid_intrusions_right=False,
+        ),
         expand=True,
     )
 

@@ -150,6 +150,14 @@ async def main(page: ft.Page):
     marquee = MarqueeFooter(page)
     footer_view = await marquee.build()
     page._marquee = marquee
-    page.add(ft.Container(content=footer_view, alignment=ft.Alignment.BOTTOM_CENTER))
+    # Avvolgi il footer in SafeArea per rispettare le barre di sistema su Android
+    footer_safe = ft.SafeArea(
+        content=footer_view,
+        avoid_intrusions_bottom=True,
+        avoid_intrusions_top=False,
+        avoid_intrusions_left=False,
+        avoid_intrusions_right=False,
+    )
+    page.add(footer_safe)
 
     page.update()
