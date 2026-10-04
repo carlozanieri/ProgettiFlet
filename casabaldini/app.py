@@ -39,7 +39,7 @@ async def main(page: ft.Page):
             spacing=5,
             tight=True,
         ),
-        bgcolor="#032a3e",
+        bgcolor="#2c0404",
         padding=ft.Padding.symmetric(horizontal=10, vertical=5),
         border_radius=8,
     )

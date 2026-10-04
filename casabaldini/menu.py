@@ -48,7 +48,7 @@ async def build_menu(page: ft.Page, on_navigate) -> ft.NavigationDrawer:
             ft.Container(
                 content=ft.Text("CasaBaldini", size=22, weight=ft.FontWeight.BOLD, color="white"),
                 padding=20,
-                bgcolor="#043a55",
+                bgcolor="#2c0404",
             ),
             ft.Divider(height=1),
             ft.Column(controls=voci, spacing=0, scroll=ft.ScrollMode.AUTO, expand=True),
