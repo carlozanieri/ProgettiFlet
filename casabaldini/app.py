@@ -26,7 +26,7 @@ async def main(page: ft.Page):
             controls=[
                 ft.Text(
                     "CasaBaldini",
-                    size=18,
+                    size=12,
                     weight=ft.FontWeight.BOLD,
                     color="white",
                 ),
