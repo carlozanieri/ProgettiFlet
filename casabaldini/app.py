@@ -10,22 +10,56 @@ from sliders import build_sliders
 from dettaglio_slider import build_dettaglio
 from marquee import MarqueeFooter
 
+
 async def main(page: ft.Page):
     page.title = "CasaBaldini"
     page.bgcolor = "#000000"
     page.padding = 0
     page.scroll = ft.ScrollMode.AUTO
- 
+
+    # ==================== NAVBAR PERSONALIZZATA ====================
+    def apri_menu(e):
+        page.run_task(page.show_drawer)
+
+    navbar = ft.Container(
+        content=ft.Row(
+            controls=[
+                ft.Text(
+                    "CasaBaldini",
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    color="white",
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.MENU,
+                    icon_color="white",
+                    on_click=apri_menu,
+                ),
+            ],
+            spacing=5,
+            tight=True,
+        ),
+        bgcolor="#032a3e",
+        padding=ft.Padding.symmetric(horizontal=10, vertical=5),
+        border_radius=8,
+    )
+
+    top_bar = ft.Row(
+        controls=[navbar],
+        alignment=ft.MainAxisAlignment.START,  # <-- allineato a sinistra
+    )
+    # ==================== CONTENUTO ====================
     content_area = ft.Column(controls=[], expand=True, scroll=ft.ScrollMode.AUTO)
+    page.add(top_bar)
     page.add(content_area)
- 
+
     # Stato per fermare l'autoplay quando si cambia vista
     def ferma_slider():
         if hasattr(page, "_slider_attivo") and page._slider_attivo:
             page._slider_attivo.stop()
             page._slider_attivo = None
- 
-     # ==================== CALLBACK DETTAGLIO ====================
+
+    # ==================== CALLBACK DETTAGLIO ====================
     async def apri_dettaglio(slide, img_url):
         print(f"DEBUG apri_dettaglio: slide={slide.get('titolo')}, img={img_url}")
         ferma_slider()
@@ -42,31 +76,20 @@ async def main(page: ft.Page):
         content_area.controls.append(vista)
         page.update()
         print(f"DEBUG apri_dettaglio: content_area aggiornata")
- 
-    async def torna_indietro():
-        # Ricostruisce lo slider della stessa sezione
-        voce = getattr(page, "_voce_corrente", None)
-        if voce:
-            await navigate(voce)
- 
-        vista = await build_dettaglio(page, slide, img_url, on_back=torna_indietro)
-        content_area.controls.clear()
-        content_area.controls.append(vista)
-        page.update()
- 
-     # ==================== NAVIGATORE ====================
+
+    # ==================== NAVIGATORE ====================
     async def navigate(voce: dict):
         link = voce.get("link", "")
         titolo = voce.get("titolo", "")
         tipopage = voce.get("tipopage", "")
- 
+
         print(f"DEBUG navigate: titolo={titolo}, link={link}, tipo={tipopage}")
         ferma_slider()
- 
+
         try:
             if tipopage == "esterna":
                 return  # gestito da ft.OpenUrl nel menu
- 
+
             if link == "/" or link == "":
                 vista = await build_home(page)
             elif link == "/casabaldini/index" or link == "/casabaldini":
@@ -86,12 +109,12 @@ async def main(page: ft.Page):
                 vista = ft.Container(
                     content=ft.Text(f"Pagina: {titolo} ({link})", color="white", size=16),
                     padding=20,
-                 )
- 
+                )
+
             content_area.controls.clear()
             content_area.controls.append(vista)
             page.update()
- 
+
         except Exception as e:
             print(f"ERRORE navigazione: {e}")
             import traceback
@@ -99,28 +122,19 @@ async def main(page: ft.Page):
             content_area.controls.clear()
             content_area.controls.append(ft.Text(f"Errore: {e}", color="red", size=14))
             page.update()
- 
+
     async def home_callback():
         await navigate({"link": "/", "tipopage": "interna", "titolo": "Home"})
- 
-    # ==================== DRAWER + APP BAR ====================
+
+    # ==================== DRAWER ====================
     drawer = await build_menu(page, on_navigate=navigate)
     page.drawer = drawer
- 
-    def apri_menu(e):
-        page.run_task(page.show_drawer)
- 
-    page.appbar = ft.AppBar(
-         leading=ft.IconButton(icon=ft.Icons.MENU, on_click=apri_menu),
-         title=ft.Text("CasaBaldini"),
-         bgcolor="#043a55",
-     )
- 
+
     # ==================== VISTA INIZIALE ====================
     home_view = await build_home(page)
     content_area.controls.append(home_view)
-    
-        # Footer marquee (fisso in fondo)
+
+    # Footer marquee (fisso in fondo)
     marquee = MarqueeFooter(page)
     footer_view = await marquee.build()
     page._marquee = marquee
