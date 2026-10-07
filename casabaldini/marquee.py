@@ -39,7 +39,7 @@ class MarqueeFooter:
             height=60,
             bgcolor="#2c0404",
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            expand=True,
+            expand=False,
             on_hover=self._on_hover,
             content=ft.GestureDetector(
                 content=self.stack,

@@ -4,5 +4,3 @@ psycopg2-binary
 pydantic 
 flet 
 httpx
-pyjwt
-passlib[bcrypt]

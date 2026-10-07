@@ -74,37 +74,17 @@ async def build_linkutili(page: ft.Page, on_home) -> ft.Container:
         ),
     )
 
-    # Composizione finale
-    contenuto = ft.Column(
+    pagina = ft.Column(
         controls=[
             ft.Container(content=titolo, padding=20, alignment=ft.Alignment.CENTER),
             ft.Divider(height=1, color="#444444"),
-            ft.Container(
-                content=links_column,
-                padding=ft.Padding.symmetric(horizontal=20, vertical=10),
-            ),
-            ft.Container(
-                content=btn_home,
-                alignment=ft.Alignment.CENTER,
-                padding=20,
-            ),
+            ft.Container(content=links_column, padding=ft.Padding.symmetric(horizontal=20, vertical=10)),
+            #ft.Container(content=nota, padding=10),
+            ft.Container(content=btn_home, alignment=ft.Alignment.CENTER, padding=20),
         ],
         spacing=10,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         expand=True,
         scroll=ft.ScrollMode.AUTO,
     )
-
-    # Avvolgi in SafeArea per rispettare la barra di sistema in fondo
-    pagina = ft.Container(
-        content=ft.SafeArea(
-            content=contenuto,
-            avoid_intrusions_bottom=True,
-            avoid_intrusions_top=False,
-            avoid_intrusions_left=False,
-            avoid_intrusions_right=False,
-        ),
-        expand=True,
-    )
-
     return pagina

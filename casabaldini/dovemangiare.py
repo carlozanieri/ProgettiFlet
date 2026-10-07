@@ -91,14 +91,12 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Container:
         ),
     )
 
-    contenuto = ft.Column(
+       # Composizione finale
+    pagina = ft.Column(
         controls=[
             ft.Container(content=titolo, padding=20, alignment=ft.Alignment.CENTER),
             ft.Divider(height=1, color="#444444"),
-            ft.Container(
-                content=ristoranti_column,
-                padding=ft.Padding.symmetric(horizontal=20, vertical=10),
-            ),
+            ft.Container(content=ristoranti_column, padding=ft.Padding.symmetric(horizontal=20, vertical=10)),
             ft.Container(content=nota, padding=10),
             ft.Container(content=btn_home, alignment=ft.Alignment.CENTER, padding=20),
         ],
@@ -107,17 +105,4 @@ async def build_dovemangiare(page: ft.Page, on_home) -> ft.Container:
         expand=True,
         scroll=ft.ScrollMode.AUTO,
     )
-
-    # Avvolgi in SafeArea per rispettare la barra di sistema in fondo
-    pagina = ft.Container(
-        content=ft.SafeArea(
-            content=contenuto,
-            avoid_intrusions_bottom=True,
-            avoid_intrusions_top=False,
-            avoid_intrusions_left=False,
-            avoid_intrusions_right=False,
-        ),
-        expand=True,
-    )
-
     return pagina

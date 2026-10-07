@@ -7,11 +7,20 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from config import DATABASE_URL, API_HOST, API_PORT, MEDIA_ROOT
-
-
+from pydantic import BaseModel, EmailStr
+#from auth import create_access_token, verify_password, get_current_user
+from pydantic import BaseModel, EmailStr
+from fastapi import Depends
+from auth import (
+    verify_password,
+    create_access_token,
+    get_current_user,
+    hash_password,
+)
 # ==========================
 # MODELLI PYDANTIC
 # ==========================
+
 
 class Category(BaseModel):
     id: int
@@ -238,12 +247,12 @@ def get_product(slug: str):
 
 
 def get_or_create_cart(session_key: str) -> int:
-    """Ottiene o crea un carrello per la sessione corrente."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
+            # Cerca SOLO carrelli anonimi (user_id IS NULL)
             cur.execute(
-                "SELECT id FROM cart_cart WHERE session_key = %s",
+                "SELECT id FROM cart_cart WHERE session_key = %s AND user_id IS NULL",
                 (session_key,)
             )
             row = cur.fetchone()
@@ -262,25 +271,21 @@ def get_or_create_cart(session_key: str) -> int:
 
 
 @app.get("/api/v1/cart", response_model=CartResponse)
+@app.get("/api/v1/cart", response_model=CartResponse)
 def get_cart(session_key: str = Query(...)):
-    """Restituisce il carrello corrente."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM cart_cart WHERE session_key = %s", (session_key,))
+            # Cerca SOLO carrelli anonimi
+            cur.execute(
+                "SELECT id FROM cart_cart WHERE session_key = %s AND user_id IS NULL",
+                (session_key,)
+            )
             row = cur.fetchone()
             if not row:
                 return {"cart_id": 0, "items": [], "total_items": 0, "total_price": 0}
             cart_id = row["id"]
-            cur.execute("""
-                SELECT ci.id, ci.product_id, ci.quantity,
-                       p.name AS product_name, p.slug AS product_slug,
-                       p.image AS product_image, p.price
-                FROM cart_cartitem ci
-                JOIN store_product p ON ci.product_id = p.id
-                WHERE ci.cart_id = %s
-                ORDER BY ci.added_at
-            """, (cart_id,))
+            # ... resto invariato
             items = []
             for r in cur.fetchall():
                 item = dict(r)
@@ -374,6 +379,319 @@ def remove_from_cart(
 # ==========================
 # AVVIO
 # ==========================
+
+
+# api/main.py (da aggiungere)
+
+
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    first_name: str = ""
+    last_name: str = ""
+
+
+
+@app.post("/api/v1/auth/register")
+def register(user_data: UserRegister):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            # Verifica se l'utente esiste già
+            cur.execute("SELECT id FROM auth_user WHERE username = %s OR email = %s", (user_data.username, user_data.email))
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="Username o email già in uso")
+            
+            # Inserisci il nuovo utente (Django usa PBKDF2 di default)
+            #from django.contrib.auth.hashers import make_password # Nota: richiede Django installato per la creazione
+            #hashed_pw = make_password(user_data.password)
+            hashed_pw = hash_password(user_data.password)
+            cur.execute("""
+                INSERT INTO auth_user (username, email, password, first_name, last_name, is_active, is_staff, is_superuser, date_joined)
+                VALUES (%s, %s, %s, %s, %s, TRUE, FALSE, FALSE, NOW()) RETURNING id
+            """, (user_data.username, user_data.email, hashed_pw, user_data.first_name, user_data.last_name))
+        conn.commit()
+        return {"message": "Utente registrato con successo"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    first_name: str
+    last_name: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    username: str
+
+# api/main.py — AGGIUNGI gli endpoint di autenticazione
+
+@app.post("/api/v1/auth/login", response_model=TokenResponse)
+def login(credentials: UserLogin):
+    """Login: restituisce un JWT se le credenziali sono valide."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, username, password FROM auth_user "
+                "WHERE username = %s AND is_active = TRUE",
+                (credentials.username,)
+            )
+            user = cur.fetchone()
+
+        if not user or not verify_password(credentials.password, user["password"]):
+            raise HTTPException(status_code=401, detail="Credenziali non valide")
+
+        token = create_access_token(data={
+            "sub": user["username"],
+            "user_id": user["id"],
+        })
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user_id": user["id"],
+            "username": user["username"],
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/v1/auth/me", response_model=UserResponse)
+def get_me(current_user: dict = Depends(get_current_user)):
+    """Restituisce i dati dell'utente autenticato."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, username, email, first_name, last_name "
+                "FROM auth_user WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="Utente non trovato")
+            return dict(user)
+    finally:
+        conn.close()
+
+# api/main.py — AGGIUNGI prima di if __name__
+
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    first_name: str = ""
+    last_name: str = ""
+
+
+class RegisterResponse(BaseModel):
+    message: str
+    user_id: int
+    username: str
+
+
+@app.post("/api/v1/auth/register", response_model=RegisterResponse)
+def register(user_data: UserRegister):
+    """Registra un nuovo utente."""
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            # Verifica duplicati (username o email)
+            cur.execute(
+                "SELECT id FROM auth_user WHERE username = %s OR email = %s",
+                (user_data.username, user_data.email)
+            )
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Username o email già in uso"
+                )
+
+            # Hash della password nel formato Django
+            hashed_pw = hash_password(user_data.password)
+
+            # Inserisci il nuovo utente
+            cur.execute("""
+                INSERT INTO auth_user (
+                    username, email, password,
+                    first_name, last_name,
+                    is_active, is_staff, is_superuser,
+                    date_joined
+                )
+                VALUES (%s, %s, %s, %s, %s, TRUE, FALSE, FALSE, NOW())
+                RETURNING id
+            """, (
+                user_data.username,
+                user_data.email,
+                hashed_pw,
+                user_data.first_name,
+                user_data.last_name,
+            ))
+            new_user_id = cur.fetchone()["id"]
+        conn.commit()
+        return {
+            "message": "Registrazione completata",
+            "user_id": new_user_id,
+            "username": user_data.username,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+    finally:
+        conn.close()
+
+
+# api/main.py — AGGIUNGI prima di if __name__
+
+class CartAssociateRequest(BaseModel):
+    session_key: str
+
+
+@app.post("/api/v1/cart/associate")
+def associate_cart(
+    data: CartAssociateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Associa il carrello anonimo all'utente autenticato.
+
+    Se l'utente ha già un carrello, i due vengono uniti.
+    """
+    user_id = current_user["user_id"]
+    session_key = data.session_key
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            # 1. Carrello anonimo (session_key)
+            cur.execute(
+                "SELECT id FROM cart_cart WHERE session_key = %s AND user_id IS NULL",
+                (session_key,)
+            )
+            anon_row = cur.fetchone()
+            anon_cart_id = anon_row["id"] if anon_row else None
+
+            # 2. Carrello già associato all'utente
+            cur.execute(
+                "SELECT id FROM cart_cart WHERE user_id = %s",
+                (user_id,)
+            )
+            user_row = cur.fetchone()
+            user_cart_id = user_row["id"] if user_row else None
+
+            # Caso A: solo carrello anonimo → associalo all'utente
+            if anon_cart_id and not user_cart_id:
+                cur.execute(
+                    "UPDATE cart_cart SET user_id = %s, updated_at = NOW() WHERE id = %s",
+                    (user_id, anon_cart_id)
+                )
+                conn.commit()
+                return {"success": True, "cart_id": anon_cart_id, "action": "associated"}
+
+            # Caso B: solo carrello utente → niente da fare
+            if not anon_cart_id and user_cart_id:
+                return {"success": True, "cart_id": user_cart_id, "action": "already_user"}
+
+            # Caso C: nessun carrello → niente da fare
+            if not anon_cart_id and not user_cart_id:
+                return {"success": True, "cart_id": 0, "action": "no_cart"}
+
+            # Caso D: entrambi esistono → unisci
+            if anon_cart_id and user_cart_id and anon_cart_id != user_cart_id:
+                # Sposta gli item del carrello anonimo al carrello utente
+                # Se lo stesso prodotto è in entrambi, somma le quantità
+                cur.execute("""
+                    INSERT INTO cart_cartitem (cart_id, product_id, quantity, added_at)
+                    SELECT %s, product_id, quantity, NOW()
+                    FROM cart_cartitem
+                    WHERE cart_id = %s
+                """, (user_cart_id, anon_cart_id))
+
+                # Elimina gli item del carrello anonimo
+                cur.execute("DELETE FROM cart_cartitem WHERE cart_id = %s", (anon_cart_id,))
+
+                # Elimina il carrello anonimo
+                cur.execute("DELETE FROM cart_cart WHERE id = %s", (anon_cart_id,))
+
+                # Aggiorna timestamp del carrello utente
+                cur.execute(
+                    "UPDATE cart_cart SET updated_at = NOW() WHERE id = %s",
+                    (user_cart_id,)
+                )
+
+                conn.commit()
+                return {"success": True, "cart_id": user_cart_id, "action": "merged"}
+
+            # Caso E: stesso carrello (impossibile ma per sicurezza)
+            conn.commit()
+            return {"success": True, "cart_id": user_cart_id, "action": "same"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+    finally:
+        conn.close()
+
+# api/main.py — AGGIUNGI prima di if __name__
+
+@app.get("/api/v1/cart/me", response_model=CartResponse)
+def get_my_cart(current_user: dict = Depends(get_current_user)):
+    """Restituisce il carrello dell'utente autenticato."""
+    user_id = current_user["user_id"]
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            # Cerca il carrello dell'utente
+            cur.execute("SELECT id FROM cart_cart WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            if not row:
+                return {"cart_id": 0, "items": [], "total_items": 0, "total_price": 0}
+
+            cart_id = row["id"]
+            cur.execute("""
+                SELECT ci.id, ci.product_id, ci.quantity,
+                       p.name AS product_name, p.slug AS product_slug,
+                       p.image AS product_image, p.price
+                FROM cart_cartitem ci
+                JOIN store_product p ON ci.product_id = p.id
+                WHERE ci.cart_id = %s
+                ORDER BY ci.added_at
+            """, (cart_id,))
+            items = []
+            for r in cur.fetchall():
+                item = dict(r)
+                item["price"] = float(item["price"])
+                item["total"] = item["price"] * item["quantity"]
+                items.append(item)
+
+            total_items = sum(i["quantity"] for i in items)
+            total_price = sum(i["total"] for i in items)
+            return {
+                "cart_id": cart_id,
+                "items": items,
+                "total_items": total_items,
+                "total_price": total_price,
+            }
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     import uvicorn

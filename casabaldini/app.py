@@ -15,65 +15,68 @@ async def main(page: ft.Page):
     page.title = "CasaBaldini"
     page.bgcolor = "#000000"
     page.padding = 0
-    page.scroll = ft.ScrollMode.AUTO
 
-    # ==================== NAVBAR PERSONALIZZATA ====================
+    # ==================== NAVBAR ====================
     def apri_menu(e):
         page.run_task(page.show_drawer)
 
     navbar = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Text(
-                    "CasaBaldini",
-                    size=18,
-                    weight=ft.FontWeight.BOLD,
-                    color="white",
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.MENU,
-                    icon_color="white",
-                    on_click=apri_menu,
-                ),
+                ft.Text("CasaBaldini", size=18, weight=ft.FontWeight.BOLD, color="white"),
+                ft.IconButton(icon=ft.Icons.MENU, icon_color="white", on_click=apri_menu),
             ],
             spacing=5,
             tight=True,
         ),
-        bgcolor="#2c0404",
+        bgcolor="#032a3e",
         padding=ft.Padding.symmetric(horizontal=10, vertical=5),
         border_radius=8,
     )
 
-    top_bar = ft.Row(
-        controls=[navbar],
-        alignment=ft.MainAxisAlignment.START,
+    top_bar = ft.Row(controls=[navbar], alignment=ft.MainAxisAlignment.START)
+
+    # ==================== AREA CONTENUTO (cambia dinamicamente) ====================
+    content_area = ft.Column(
+        controls=[],
+        expand=True,
+        scroll=ft.ScrollMode.AUTO,
     )
 
-    # Avvolgi la navbar in un Container che rispetta la SafeArea
-    top_bar_safe = ft.Container(
-        content=ft.SafeArea(
-            content=top_bar,
-            avoid_intrusions_top=True,
-            avoid_intrusions_bottom=False,
-            avoid_intrusions_left=False,
-            avoid_intrusions_right=False,
-        ),
-        expand=False,
-    )
-    # ==================== CONTENUTO ====================
-    content_area = ft.Column(controls=[], expand=True, scroll=ft.ScrollMode.AUTO)
-    page.add(top_bar_safe)
-    page.add(content_area)
+    # ==================== MARQUEE (fisso in fondo) ====================
+    marquee = MarqueeFooter(page)
+    footer_view = await marquee.build()
+    page._marquee = marquee
 
-    # Stato per fermare l'autoplay quando si cambia vista
+    # ==================== LAYOUT UNICO DELLA PAGINA ====================
+    # Navbar in alto, content_area al centro, marquee in basso
+    layout = ft.Column(
+        controls=[
+            top_bar,
+            content_area,   # qui le pagine sostituiscono solo i propri figli
+            footer_view,    # marquee sempre presente
+        ],
+        expand=True,
+        spacing=0,
+    )
+
+    # Avvolgi tutto in SafeArea (barre di sistema su Android)
+    pagina_safe = ft.SafeArea(
+        content=layout,
+        avoid_intrusions_top=True,
+        avoid_intrusions_bottom=True,
+        expand=True,
+    )
+
+    page.add(pagina_safe)
+
+    # ==================== STATO E CALLBACK ====================
     def ferma_slider():
         if hasattr(page, "_slider_attivo") and page._slider_attivo:
             page._slider_attivo.stop()
             page._slider_attivo = None
 
-    # ==================== CALLBACK DETTAGLIO ====================
     async def apri_dettaglio(slide, img_url):
-        print(f"DEBUG apri_dettaglio: slide={slide.get('titolo')}, img={img_url}")
         ferma_slider()
         page._voce_corrente = getattr(page, "_voce_corrente", None)
 
@@ -83,13 +86,10 @@ async def main(page: ft.Page):
                 await navigate(voce)
 
         vista = await build_dettaglio(page, slide, img_url, on_back=torna_indietro)
-        print(f"DEBUG apri_dettaglio: vista costruita, tipo={type(vista)}")
         content_area.controls.clear()
         content_area.controls.append(vista)
         page.update()
-        print(f"DEBUG apri_dettaglio: content_area aggiornata")
 
-    # ==================== NAVIGATORE ====================
     async def navigate(voce: dict):
         link = voce.get("link", "")
         titolo = voce.get("titolo", "")
@@ -100,7 +100,7 @@ async def main(page: ft.Page):
 
         try:
             if tipopage == "esterna":
-                return  # gestito da ft.OpenUrl nel menu
+                return
 
             if link == "/" or link == "":
                 vista = await build_home(page)
@@ -145,19 +145,4 @@ async def main(page: ft.Page):
     # ==================== VISTA INIZIALE ====================
     home_view = await build_home(page)
     content_area.controls.append(home_view)
-
-    # Footer marquee (fisso in fondo)
-    marquee = MarqueeFooter(page)
-    footer_view = await marquee.build()
-    page._marquee = marquee
-    # Avvolgi il footer in SafeArea per rispettare le barre di sistema su Android
-    footer_safe = ft.SafeArea(
-        content=footer_view,
-        avoid_intrusions_bottom=True,
-        avoid_intrusions_top=False,
-        avoid_intrusions_left=False,
-        avoid_intrusions_right=False,
-    )
-    page.add(footer_safe)
-
     page.update()

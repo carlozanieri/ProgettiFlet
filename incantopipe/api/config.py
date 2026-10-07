@@ -8,6 +8,10 @@ DATABASE_URL = "postgresql://postgres:treX39@incantopipe.it:5432/incanto"
 
 API_HOST = "0.0.0.0"
 API_PORT = 8889
+# JWT
+SECRET_KEY = "-TkN1fzzZbw7288tspLR5aL9C5wmQrDT8j6JnlBfkUB770zPqLGAzuC1-uVWjlX412IZPKbBsJOwYWfkixHuvw"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 1 settimana
 
 PAYPAL_CLIENT_ID = "tuo-client-id-sandbox"
 PAYPAL_SECRET = "tuo-secret-sandbox"

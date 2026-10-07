@@ -1,4 +1,6 @@
 # incantopipe_flet/app/api_client.py
+import token
+
 import httpx
 from typing import Optional
 from config import API_BASE_URL
@@ -113,3 +115,48 @@ class APIClient:
 
     def close(self):
         self.client.close()
+
+    # app/api_client.py (da aggiungere)
+
+    def set_auth_token(self, token: str):
+        """Salva il token per le richieste future."""
+        self.client.headers.update({"Authorization": f"Bearer {token}"})
+
+    def register(self, username, email, password, first_name="", last_name=""):
+        try:
+            r = self.client.post(f"{self.base_url}/auth/register", json={
+                "username": username, "email": email, "password": password,
+                "first_name": first_name, "last_name": last_name
+            })
+            r.raise_for_status()
+            return True, "Registrazione completata"
+        except httpx.HTTPError as e:
+            return False, str(e)
+
+    def login(self, username, password):
+        try:
+            r = self.client.post(f"{self.base_url}/auth/login", json={
+                "username": username, "password": password
+            })
+            r.raise_for_status()
+            data = r.json()
+            self.set_auth_token(data["access_token"])
+            return True, data
+        except httpx.HTTPError as e:
+            return False, str(e)
+
+
+    # app/api_client.py — AGGIUNGI alla classe APIClient
+
+    def associate_cart(self, session_key: str) -> dict:
+        """Associa il carrello anonimo all'utente autenticato."""
+        try:
+            r = self.client.post(
+                f"{self.base_url}/cart/associate",
+                json={"session_key": session_key},
+            )
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPError as e:
+            print(f"Errore associate_cart: {e}")
+            return {"success": False}
