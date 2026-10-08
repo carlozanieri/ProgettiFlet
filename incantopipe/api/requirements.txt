@@ -1,4 +1,10 @@
-fastapi
-uvicorn[standard]
-psycopg2-binary
-pydantic
+fastapi 
+uvicorn[standard] 
+psycopg2-binary 
+pydantic 
+flet 
+httpx
+pyjwt
+passlib[bcrypt]
+
+django

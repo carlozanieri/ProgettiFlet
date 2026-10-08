@@ -6,3 +6,5 @@ flet
 httpx
 pyjwt
 passlib[bcrypt]
+
+django
