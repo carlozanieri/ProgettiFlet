@@ -304,39 +304,80 @@ def get_cart(session_key: str = Query(...)):
         conn.close()
 
 
+# api/main.py — SOSTITUISCI add_to_cart
+
 @app.post("/api/v1/cart/add")
 def add_to_cart(
     session_key: str = Query(...),
     data: CartItemAdd = ...,
 ):
-    """Aggiunge un prodotto al carrello."""
+    """Aggiunge un prodotto al carrello e ne blocca la disponibilità."""
     conn = get_db()
     try:
-        cart_id = get_or_create_cart(session_key)
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, quantity FROM cart_cartitem "
-                "WHERE cart_id = %s AND product_id = %s",
-                (cart_id, data.product_id)
-            )
-            row = cur.fetchone()
-            if row:
-                cur.execute(
-                    "UPDATE cart_cartitem SET quantity = quantity + %s WHERE id = %s",
-                    (data.quantity, row["id"])
-                )
+            # 1. Verifica disponibilità con lock (evita race condition)
+            cur.execute("""
+                SELECT id, name, stock, available
+                FROM store_product
+                WHERE id = %s
+                FOR UPDATE
+            """, (data.product_id,))
+            product = cur.fetchone()
+            if not product:
+                raise HTTPException(status_code=404, detail="Prodotto non trovato")
+            if not product["available"] or product["stock"] <= 0:
+                raise HTTPException(status_code=400, detail="Prodotto non più disponibile")
+
+            # 2. Ottieni o crea il carrello
+            cart_id = get_or_create_cart(session_key)
+
+            # 3. Verifica se il prodotto è già nel carrello
+            cur.execute("""
+                SELECT id, quantity FROM cart_cartitem
+                WHERE cart_id = %s AND product_id = %s
+            """, (cart_id, data.product_id))
+            existing = cur.fetchone()
+
+            if existing:
+                # Già nel carrello: aggiorna quantità (solo per prodotti non unici)
+                cur.execute("""
+                    UPDATE cart_cartitem SET quantity = quantity + %s
+                    WHERE id = %s
+                """, (data.quantity, existing["id"]))
             else:
-                cur.execute(
-                    "INSERT INTO cart_cartitem (cart_id, product_id, quantity, added_at) "
-                    "VALUES (%s, %s, %s, NOW())",
-                    (cart_id, data.product_id, data.quantity)
-                )
-            cur.execute("UPDATE cart_cart SET updated_at = NOW() WHERE id = %s", (cart_id,))
+                # Nuovo item: inserisci
+                cur.execute("""
+                    INSERT INTO cart_cartitem (cart_id, product_id, quantity, added_at)
+                    VALUES (%s, %s, %s, NOW())
+                """, (cart_id, data.product_id, data.quantity))
+
+                # 4. Blocca il prodotto (solo per pezzi unici: stock = 1)
+                cur.execute("""
+                    UPDATE store_product
+                    SET stock = 0, available = FALSE
+                    WHERE id = %s
+                """, (data.product_id,))
+
+            # 5. Reset del timer del carrello
+            cur.execute("""
+                UPDATE cart_cart
+                SET updated_at = NOW(), reminder_sent = FALSE
+                WHERE id = %s
+            """, (cart_id,))
+
         conn.commit()
         return {"success": True, "cart_id": cart_id}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
+
+# api/main.py — SOSTITUISCI update_cart_item
 
 @app.post("/api/v1/cart/update")
 def update_cart_item(
@@ -344,35 +385,100 @@ def update_cart_item(
     item_id: int = Query(...),
     data: CartItemUpdate = ...,
 ):
-    """Aggiorna la quantità di un articolo."""
+    """Aggiorna la quantità di un articolo (reset del timer)."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
+            # 1. Trova l'item per ottenere il cart_id
+            cur.execute("SELECT cart_id FROM cart_cartitem WHERE id = %s", (item_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Articolo non trovato")
+
+            cart_id = row["cart_id"]
+
+            # 2. Se la quantità è <= 0, rimuovi e libera
             if data.quantity <= 0:
+                cur.execute("""
+                    SELECT product_id FROM cart_cartitem WHERE id = %s
+                """, (item_id,))
+                item = cur.fetchone()
+                if item:
+                    cur.execute("""
+                        UPDATE store_product
+                        SET stock = 1, available = TRUE
+                        WHERE id = %s
+                    """, (item["product_id"],))
                 cur.execute("DELETE FROM cart_cartitem WHERE id = %s", (item_id,))
             else:
-                cur.execute(
-                    "UPDATE cart_cartitem SET quantity = %s WHERE id = %s",
-                    (data.quantity, item_id)
-                )
+                cur.execute("""
+                    UPDATE cart_cartitem SET quantity = %s WHERE id = %s
+                """, (data.quantity, item_id))
+
+            # 3. Reset del timer
+            cur.execute("""
+                UPDATE cart_cart
+                SET updated_at = NOW(), reminder_sent = FALSE
+                WHERE id = %s
+            """, (cart_id,))
+
         conn.commit()
         return {"success": True}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
+
+# api/main.py — SOSTITUISCI remove_from_cart
 
 @app.post("/api/v1/cart/remove")
 def remove_from_cart(
     session_key: str = Query(...),
     item_id: int = Query(...),
 ):
-    """Rimuove un articolo dal carrello."""
+    """Rimuove un articolo dal carrello e ne libera la disponibilità."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
+            # 1. Trova l'item e il cart_id
+            cur.execute("""
+                SELECT product_id, cart_id FROM cart_cartitem
+                WHERE id = %s
+            """, (item_id,))
+            row = cur.fetchone()
+            if not row:
+                return {"success": True}
+
+            product_id = row["product_id"]
+            cart_id = row["cart_id"]
+
+            # 2. Ripristina la disponibilità del prodotto
+            cur.execute("""
+                UPDATE store_product
+                SET stock = 1, available = TRUE
+                WHERE id = %s
+            """, (product_id,))
+
+            # 3. Elimina l'item
             cur.execute("DELETE FROM cart_cartitem WHERE id = %s", (item_id,))
+
+            # 4. Reset del timer del carrello
+            cur.execute("""
+                UPDATE cart_cart
+                SET updated_at = NOW(), reminder_sent = FALSE
+                WHERE id = %s
+            """, (cart_id,))
+
         conn.commit()
         return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
