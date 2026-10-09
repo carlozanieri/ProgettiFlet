@@ -10,7 +10,6 @@ from config import DATABASE_URL, API_HOST, API_PORT, MEDIA_ROOT
 #from pydantic import BaseModel, EmailStr
 #from auth import create_access_token, verify_password, get_current_user
 from pydantic import EmailStr
-import RegisterResponse
 from fastapi import Depends
 from auth import (
     verify_password,
@@ -26,7 +25,7 @@ class RegisterResponse(BaseModel):
     message: str
     user_id: int
     username: str
-    
+
 class Category(BaseModel):
     id: int
     name: str
