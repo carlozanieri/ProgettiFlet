@@ -7,9 +7,10 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from config import DATABASE_URL, API_HOST, API_PORT, MEDIA_ROOT
-from pydantic import BaseModel, EmailStr
+#from pydantic import BaseModel, EmailStr
 #from auth import create_access_token, verify_password, get_current_user
-from pydantic import BaseModel, EmailStr
+from pydantic import EmailStr
+from pydantic import RegisterResponse
 from fastapi import Depends
 from auth import (
     verify_password,
