@@ -498,31 +498,69 @@ class UserRegister(BaseModel):
     last_name: str = ""
 
 
-
-@app.post("/api/v1/auth/register")
+@app.post("/api/v1/auth/register", response_model=RegisterResponse)
 def register(user_data: UserRegister):
+    """Registra un nuovo utente."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            # Verifica se l'utente esiste già
-            cur.execute("SELECT id FROM auth_user WHERE username = %s OR email = %s", (user_data.username, user_data.email))
+            # 1. Verifica duplicati (username o email)
+            cur.execute(
+                "SELECT id FROM auth_user WHERE username = %s OR email = %s",
+                (user_data.username, user_data.email)
+            )
             if cur.fetchone():
-                raise HTTPException(status_code=400, detail="Username o email già in uso")
-            
-            # Inserisci il nuovo utente (Django usa PBKDF2 di default)
-            #from django.contrib.auth.hashers import make_password # Nota: richiede Django installato per la creazione
-            #hashed_pw = make_password(user_data.password)
+                raise HTTPException(
+                    status_code=400,
+                    detail="Username o email già in uso"
+                )
+
+            # 2. Hash della password nel formato Django
+            # Questa operazione è eseguita qui, prima di qualsiasi operazione DB
             hashed_pw = hash_password(user_data.password)
+
+            # 3. Inserisci il nuovo utente
             cur.execute("""
-                INSERT INTO auth_user (username, email, password, first_name, last_name, is_active, is_staff, is_superuser, date_joined)
-                VALUES (%s, %s, %s, %s, %s, TRUE, FALSE, FALSE, NOW()) RETURNING id
-            """, (user_data.username, user_data.email, hashed_pw, user_data.first_name, user_data.last_name))
+                INSERT INTO auth_user (
+                    username, email, password,
+                    first_name, last_name,
+                    is_active, is_staff, is_superuser,
+                    date_joined
+                )
+                VALUES (%s, %s, %s, %s, %s, TRUE, FALSE, FALSE, NOW())
+                RETURNING id
+            """, (
+                user_data.username,
+                user_data.email,
+                hashed_pw,
+                user_data.first_name,
+                user_data.last_name,
+            ))
+            new_user_id = cur.fetchone()["id"]
+
+        # Esegue il commit solo se tutto il blocco 'with' è andato a buon fine
         conn.commit()
-        return {"message": "Utente registrato con successo"}
-    except Exception as e:
+
+        return {
+            "message": "Registrazione completata",
+            "user_id": new_user_id,
+            "username": user_data.username,
+        }
+
+    except HTTPException:
+        # Se l'eccezione è già un HTTPException (es. 400), la rilanciamo
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise
+    except Exception as e:
+        # Per qualsiasi altro errore, eseguiamo il rollback e restituiamo un 500 generico
+        conn.rollback()
+        # Logga l'errore sul server per il debug
+        print(f"ERRORE CRITICO durante la registrazione: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Errore interno del server durante la registrazione.")
     finally:
+        # La connessione viene sempre chiusa, indipendentemente dall'esito
         conn.close()
 
 
