@@ -39,20 +39,17 @@ async def main(page: ft.Page):
     # ============================================================
 
     def update_header():
-        cart = api.get_cart(session_key)
         header_area.controls.clear()
         header_area.controls.append(
-            build_header(
-                on_home_click=lambda e: go_home(),
-                on_cart_click=lambda e: go_cart(),
-                on_login_click=lambda: go_login(from_view="catalog"),
-                on_register_click=lambda: go_register(from_view="catalog"),
-                on_logout_click=lambda: do_logout(),
-                on_orders_click=lambda: page.show_dialog(
-                    ft.SnackBar(content=ft.Text("I miei ordini - in arrivo (Fase 6)"))
-                ),
-                cart_count=cart["total_items"],
-                user=state["user"],
+            ft.Container(
+                content=ft.Row([
+                    ft.TextButton(
+                        "InCantoPipe",
+                        on_click=lambda e: go_home(),
+                        style=ft.ButtonStyle(color=ft.Colors.BROWN_700),
+                    ),
+                ]),
+                padding=10,
             )
         )
         page.update()
