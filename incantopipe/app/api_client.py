@@ -145,7 +145,6 @@ class APIClient:
         except httpx.HTTPError as e:
             return False, str(e)
 
-
     # app/api_client.py — AGGIUNGI alla classe APIClient
 
     def associate_cart(self, session_key: str) -> dict:
@@ -160,3 +159,5 @@ class APIClient:
         except httpx.HTTPError as e:
             print(f"Errore associate_cart: {e}")
             return {"success": False}
+
+        
