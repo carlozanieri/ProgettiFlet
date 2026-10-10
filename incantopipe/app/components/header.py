@@ -7,17 +7,12 @@ def build_header(
     on_cart_click=None,
     on_login_click=None,
     on_register_click=None,
-    on_logout_click=None,
-    on_orders_click=None,
+    on_logout_click=None,          # ← NUOVO
     cart_count: int = 0,
     user: dict = None,
 ) -> ft.Container:
-    """
-    Header riutilizzabile con:
-    - Logo/nome (torna alla home)
-    - Badge carrello
-    - Pulsanti Accedi/Registrati (anonimo) o menu utente (loggato)
-    """
+    """Header con catalogo, carrello, e pulsanti di autenticazione."""
+
     # Badge carrello
     cart_badge = (
         ft.Container(
@@ -30,44 +25,22 @@ def build_header(
         else ft.Container()
     )
 
-    # Blocco utente (menu o pulsanti)
+    # Blocco utente
     if user:
         display_name = user.get("first_name") or user.get("username", "Utente")
-        user_block = ft.PopupMenuButton(
-            items=[
-                ft.PopupMenuItem(
-                    content=ft.Text(f"Ciao, {display_name}"),
-                    disabled=True,
-                ),
-                ft.PopupMenuItem(),  # separatore
-                ft.PopupMenuItem(
-                    content=ft.Text("I miei ordini"),
-                    icon=ft.Icons.RECEIPT_LONG,
-                    on_click=lambda e: on_orders_click() if on_orders_click else None,
-                ),
-                ft.PopupMenuItem(
-                    content=ft.Text("Logout"),
-                    icon=ft.Icons.LOGOUT,
-                    on_click=lambda e: on_logout_click() if on_logout_click else None,
-                ),
-            ],
-            icon=ft.Icons.ACCOUNT_CIRCLE,
-            icon_color=ft.Colors.BROWN_700,
-        )
+        user_block = ft.Row([
+            ft.Text(f"Ciao, {display_name}", size=12),
+            ft.TextButton(
+                "Logout",
+                on_click=lambda e: on_logout_click() if on_logout_click else None,
+            ),
+        ], spacing=5)
     else:
         user_block = ft.Row([
-            ft.TextButton(
-                content=ft.Text("Accedi"),
-                on_click=lambda e: on_login_click() if on_login_click else None,
-            ),
-            ft.Button(
-                content=ft.Text("Registrati"),
-                style=ft.ButtonStyle(
-                    bgcolor=ft.Colors.BROWN_700,
-                    color=ft.Colors.WHITE,
-                ),
-                on_click=lambda e: on_register_click() if on_register_click else None,
-            ),
+            ft.TextButton("Accedi",
+                on_click=lambda e: on_login_click() if on_login_click else None),
+            ft.TextButton("Registrati",
+                on_click=lambda e: on_register_click() if on_register_click else None),
         ], spacing=5)
 
     return ft.Container(
@@ -89,12 +62,11 @@ def build_header(
                 user_block,
             ], spacing=0),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        padding=ft.Padding.symmetric(vertical=10, horizontal=10),
+        padding=ft.Padding.symmetric(vertical=15, horizontal=10),
     )
 
 
 def build_page_title(title: str) -> ft.Text:
-    """Titolo di sezione riutilizzabile."""
     return ft.Text(
         title,
         size=28,

@@ -160,4 +160,65 @@ class APIClient:
             print(f"Errore associate_cart: {e}")
             return {"success": False}
 
-        
+    def set_auth_token(self, token: str):
+        """Salva il token per le richieste future."""
+        self.client.headers.update({"Authorization": f"Bearer {token}"})
+
+    def clear_auth_token(self):
+        """Rimuove il token (logout)."""
+        self.client.headers.pop("Authorization", None)
+
+    def get_me(self) -> dict | None:
+        """Restituisce i dati dell'utente autenticato, o None."""
+        try:
+            r = self.client.get(f"{self.base_url}/auth/me")
+            if r.status_code == 200:
+                return r.json()
+            return None
+        except httpx.HTTPError:
+            return None
+
+    def login(self, username: str, password: str) -> tuple:
+        """Effettua il login. Ritorna (success, data_o_messaggio)."""
+        try:
+            r = self.client.post(
+                f"{self.base_url}/auth/login",
+                json={"username": username, "password": password},
+            )
+            if r.status_code == 200:
+                data = r.json()
+                self.set_auth_token(data["access_token"])
+                return True, data
+            else:
+                try:
+                    detail = r.json().get("detail", "Credenziali non valide")
+                except Exception:
+                    detail = r.text
+                return False, detail
+        except httpx.HTTPError as e:
+            return False, f"Errore di rete: {e}"
+
+    def register(self, username: str, email: str, password: str,
+                 first_name: str = "", last_name: str = "") -> tuple:
+        """Registra un nuovo utente. Ritorna (success, message)."""
+        try:
+            r = self.client.post(
+                f"{self.base_url}/auth/register",
+                json={
+                    "username": username,
+                    "email": email,
+                    "password": password,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                },
+            )
+            if r.status_code == 200:
+                return True, r.json().get("message", "Registrazione completata")
+            else:
+                try:
+                    detail = r.json().get("detail", "Errore sconosciuto")
+                except Exception:
+                    detail = r.text
+                return False, detail
+        except httpx.HTTPError as e:
+            return False, f"Errore di rete: {e}"

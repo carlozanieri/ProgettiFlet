@@ -17,7 +17,7 @@ async def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 20
     page.scroll = ft.ScrollMode.AUTO
-
+    prefs = ft.SharedPreferences()
     # Sessione anonima univoca per questo client
     session_key = str(uuid.uuid4())[:32]
 
@@ -39,17 +39,17 @@ async def main(page: ft.Page):
     # ============================================================
 
     def update_header():
+        cart = api.get_cart(session_key)
         header_area.controls.clear()
         header_area.controls.append(
-            ft.Container(
-                content=ft.Row([
-                    ft.TextButton(
-                        "InCantoPipe",
-                        on_click=lambda e: go_home(),
-                        style=ft.ButtonStyle(color=ft.Colors.BROWN_700),
-                    ),
-                ]),
-                padding=10,
+            build_header(
+                on_home_click=lambda e: go_home(),
+                on_cart_click=lambda e: go_cart(),
+                on_login_click=lambda: go_login(from_view="catalog"),
+                on_register_click=lambda: go_register(from_view="catalog"),
+                on_logout_click=lambda: page.run_task(do_logout),   # ← NUOVO
+                cart_count=cart["total_items"],
+                user=state.get("user"),
             )
         )
         page.update()
@@ -89,11 +89,11 @@ async def main(page: ft.Page):
         else:
             go_home()
 
-    def do_logout():
+    async def do_logout():
         api.clear_auth_token()
-        ft.SharedPreferences.remove("auth_token")
-        ft.SharedPreferences.remove("user_id")
-        ft.SharedPreferences.remove("username")
+        await prefs.remove("auth_token")
+        await prefs.remove("user_id")
+        await prefs.remove("username")
         state["user"] = None
         page.show_dialog(ft.SnackBar(content=ft.Text("Logout effettuato")))
         go_home()
@@ -107,7 +107,7 @@ async def main(page: ft.Page):
         content_area.controls.clear()
         content_area.controls.append(
             build_login_view(
-                page, api,
+                page, api, prefs,
                 on_success=do_login_success,
                 on_register_click=lambda: go_register(from_view=from_view),
                 on_back=lambda: go_home(),
@@ -120,20 +120,12 @@ async def main(page: ft.Page):
         content_area.controls.clear()
         content_area.controls.append(
             build_register_view(
-                page, api,
+                page, api, prefs,
                 on_success=do_login_success,
                 on_login_click=lambda: go_login(from_view=from_view),
                 on_back=lambda: go_home(),
             )
         )
-        page.update()
-
-    def go_home():
-        content_area.controls.clear()
-        content_area.controls.append(
-            build_catalog_view(page, api, state, on_product_click=go_detail)
-        )
-        update_header()
         page.update()
 
     def go_detail(slug: str):
@@ -186,7 +178,13 @@ async def main(page: ft.Page):
     # ============================================================
 
     # Verifica se c'è un token salvato (utente già loggato)
-    prefs = ft.SharedPreferences()
+    def go_home():
+        content_area.controls.clear()
+        content_area.controls.append(
+            build_catalog_view(page, api, state, on_product_click=go_detail)
+        )
+        update_header()
+        page.update()
     saved_token = await prefs.get("auth_token")
     if saved_token:
         api.set_auth_token(saved_token)
@@ -194,12 +192,10 @@ async def main(page: ft.Page):
         if me:
             state["user"] = me
         else:
-            # Token scaduto o non valido → pulisci
             api.clear_auth_token()
             await prefs.remove("auth_token")
             await prefs.remove("user_id")
             await prefs.remove("username")
-
     page.add(header_area, ft.Divider(), content_area)
     go_home()
 

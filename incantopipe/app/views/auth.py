@@ -60,12 +60,9 @@ def build_login_view(
         loading.visible = False
 
         if success:
-            # Salva il token in modo persistente
-            prefs = ft.SharedPreferences()
             await prefs.set("auth_token", data["access_token"])
             await prefs.set("user_id", data["user_id"])
             await prefs.set("username", data["username"])
-
             on_success(data)
         else:
             error_text.value = data
@@ -141,6 +138,7 @@ def build_login_view(
 def build_register_view(
     page: ft.Page,
     api: APIClient,
+    prefs,
     on_success,
     on_login_click,
     on_back,
@@ -232,16 +230,14 @@ def build_register_view(
         loading.visible = False
 
         if login_success:
-                prefs = ft.SharedPreferences()
-                await prefs.set("auth_token", data["access_token"])
-                await prefs.set("user_id", data["user_id"])
-                await prefs.set("username", data["username"])
-
+            await prefs.set("auth_token", login_data["access_token"])
+            await prefs.set("user_id", login_data["user_id"])
+            await prefs.set("username", login_data["username"])
+            on_success(login_data)
         else:
             error_text.value = "Registrazione riuscita, ma il login automatico è fallito. Prova ad accedere manualmente."
             error_text.visible = True
             page.update()
-
     register_button = ft.Button(
         content=ft.Text("Registrati", size=16, weight=ft.FontWeight.BOLD),
         width=320,
