@@ -10,6 +10,7 @@ import asyncio
 def build_login_view(
     page: ft.Page,
     api: APIClient,
+    prefs,
     on_success,
     on_register_click,
     on_back,
