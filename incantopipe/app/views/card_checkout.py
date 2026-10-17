@@ -206,7 +206,7 @@ async def build_card_checkout_view(
     )
 
     # Abilita JavaScript PRIMA di caricare l'HTML
-    await webview.set_javascript_mode(ft.JavaScriptMode.UNRESTRICTED)
+    await webview.set_javascript_mode(fwv.JavaScriptMode.UNRESTRICTED)
 
     # Carica l'HTML con i campi carta
     await webview.load_html(html)
