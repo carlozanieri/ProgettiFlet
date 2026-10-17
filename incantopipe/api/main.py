@@ -1721,6 +1721,123 @@ def admin_cancel_order(
     finally:
         conn.close()
 
+@app.get("/api/v1/payment/paypal/config")
+def paypal_config():
+    """Restituisce la configurazione PayPal per il frontend."""
+    from config import PAYPAL_CLIENT_ID, PAYPAL_MODE
+    return {
+        "client_id": PAYPAL_CLIENT_ID,
+        "mode": PAYPAL_MODE,
+    }
+
+
+@app.get("/api/v1/payment/paypal/client-token")
+def paypal_client_token(current_user: dict = Depends(get_current_user)):
+    """Genera un browser-safe client token per il JS SDK di PayPal."""
+    import requests as req
+    from config import PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_API_URL
+
+    url = f"{PAYPAL_API_URL}/v1/oauth2/token"
+    headers = {
+        "Accept": "application/json",
+    }
+    data = {
+        "grant_type": "client_credentials",
+        "response_type": "client_token",
+        "intent": "sdk_init",
+    }
+
+    try:
+        response = req.post(
+            url,
+            headers=headers,
+            data=data,
+            auth=(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore client token PayPal: {response.text}"
+            )
+
+        token_data = response.json()
+        return {"client_token": token_data["access_token"]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+
+class PayPalCardOrderRequest(BaseModel):
+    order_id: int
+
+
+@app.post("/api/v1/payment/paypal/card-order")
+def paypal_card_order(
+    data: PayPalCardOrderRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Crea un ordine PayPal con intent=AUTHORIZE per il pagamento con carta.
+    Restituisce il paypal_order_id per inizializzare i Card Fields.
+    """
+    user_id = current_user["user_id"]
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, order_number, total, status, payment_status, user_id
+                FROM orders_order
+                WHERE id = %s AND user_id = %s
+            """, (data.order_id, user_id))
+            order = cur.fetchone()
+            if not order:
+                raise HTTPException(status_code=404, detail="Ordine non trovato")
+            if order["status"] != "pending":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Ordine in stato '{order['status']}', non 'pending'"
+                )
+
+            return_url = f"https://incantopipe.it/payment/card-success?order_id={order['id']}"
+            cancel_url = f"https://incantopipe.it/payment/card-cancel?order_id={order['id']}"
+
+            # Crea ordine PayPal con intent=AUTHORIZE
+            paypal_id, error = paypal_service.create_order(
+                order, return_url, cancel_url
+            )
+            if error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Errore PayPal: {error}"
+                )
+
+            # Salva il paypal_order_id
+            cur.execute("""
+                UPDATE orders_order
+                SET paypal_transaction_id = %s, updated = NOW()
+                WHERE id = %s
+            """, (paypal_id, order["id"]))
+
+        conn.commit()
+        return {
+            "paypal_order_id": paypal_id,
+            "order_id": order["id"],
+            "amount": float(order["total"]),
+            "currency": "EUR",
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     import uvicorn
     print(f"🚀 InCantoPipe API su http://localhost:{API_PORT}")
