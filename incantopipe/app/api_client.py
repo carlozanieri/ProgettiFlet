@@ -318,3 +318,41 @@ class APIClient:
                 return False, detail
         except httpx.HTTPError as e:
             return False, f"Errore di rete: {e}"
+
+    def paypal_config(self) -> dict:
+        """Restituisce la configurazione PayPal (client_id, mode)."""
+        try:
+            r = self.client.get(f"{self.base_url}/payment/paypal/config")
+            if r.status_code == 200:
+                return r.json()
+            return {}
+        except httpx.HTTPError:
+            return {}
+
+    def paypal_client_token(self) -> str | None:
+        """Ottiene un browser-safe client token per il SDK PayPal."""
+        try:
+            r = self.client.get(f"{self.base_url}/payment/paypal/client-token")
+            if r.status_code == 200:
+                return r.json().get("client_token")
+            return None
+        except httpx.HTTPError:
+            return None
+
+    def paypal_card_order(self, order_id: int) -> tuple:
+        """Crea un ordine PayPal per il pagamento con carta."""
+        try:
+            r = self.client.post(
+                f"{self.base_url}/payment/paypal/card-order",
+                json={"order_id": order_id},
+            )
+            if r.status_code == 200:
+                return True, r.json()
+            else:
+                try:
+                    detail = r.json().get("detail", "Errore PayPal")
+                except Exception:
+                    detail = r.text
+                return False, detail
+        except httpx.HTTPError as e:
+            return False, f"Errore di rete: {e}"

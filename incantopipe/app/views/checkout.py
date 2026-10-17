@@ -149,8 +149,41 @@ def build_checkout_view(page, api, user, on_success, on_back) -> ft.Container:
                 await launcher.launch_url(approve_url)
 
             show_waiting_screen(order_id)
-        else:
-            on_success(data)
+
+        elif payment_radio.value == "credit_card":
+            # Nuovo flusso: campi carta in WebView
+            config = api.paypal_config()
+            if not config.get("client_id"):
+                error_text.value = "Configurazione PayPal mancante"
+                error_text.visible = True
+                page.update()
+                return
+
+            card_success, card_data = api.paypal_card_order(order_id)
+            if not card_success:
+                error_text.value = f"Errore: {card_data}"
+                error_text.visible = True
+                page.update()
+                return
+
+            paypal_order_id = card_data["paypal_order_id"]
+
+            # Sostituisci il contenuto con il WebView
+            from views.card_checkout import build_card_checkout_view
+            content_area = page.controls[2]
+            content_area.controls.clear()
+            content_area.controls.append(
+                build_card_checkout_view(
+                    page, api,
+                    order_id=order_id,
+                    paypal_order_id=paypal_order_id,
+                    amount=data["total"],
+                    client_id=config["client_id"],
+                    on_success=lambda oid: on_success({"id": oid, "order_number": ""}),
+                    on_cancel=lambda: on_back(),
+                )
+            )
+            page.update()
 
     # ============================================================
     # DEFINIZIONE show_waiting_screen

@@ -1,6 +1,7 @@
 # app/views/card_checkout.py
+# app/views/card_checkout.py
 import flet as ft
-from flet_webview_all import FletWebviewAll
+import flet_webview as fwv
 
 
 # ============================================================
@@ -20,7 +21,7 @@ CARD_CHECKOUT_HTML = """
     margin: 0; padding: 20px; background: #fafafa;
   }
   .container { max-width: 500px; margin: 0 auto; }
-  h2 { color: #5d3a1a; margin-bottom: 20px; }
+  h2 { color: #5d3a1a; margin-bottom: 20px; font-size: 22px; }
   .field-container {
     height: 45px;
     border: 1px solid #ccc;
@@ -34,9 +35,10 @@ CARD_CHECKOUT_HTML = """
     border: none; border-radius: 8px; font-size: 16px;
     font-weight: bold; cursor: pointer; margin-top: 10px;
   }
-  #pay-button:disabled { background: #999; }
+  #pay-button:disabled { background: #999; cursor: not-allowed; }
   #error { color: #c00; margin-top: 10px; font-size: 14px; }
-  .label { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .label { font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
+  .note { font-size: 11px; color: #888; margin-top: 15px; text-align: center; }
 </style>
 </head>
 <body>
@@ -46,7 +48,7 @@ CARD_CHECKOUT_HTML = """
   <div class="label">Numero carta</div>
   <div class="field-container" id="card-number"></div>
 
-  <div class="label">Scadenza</div>
+  <div class="label">Scadenza (MM/YY)</div>
   <div class="field-container" id="card-expiry"></div>
 
   <div class="label">CVV</div>
@@ -54,35 +56,43 @@ CARD_CHECKOUT_HTML = """
 
   <button id="pay-button" disabled>Paga € __AMOUNT__</button>
   <div id="error"></div>
+  <div class="note">Pagamento sicuro gestito da PayPal</div>
 </div>
 
-<script src="https://www.sandbox.paypal.com/sdk/js?client-id=__CLIENT_ID__&components=card-fields&currency=EUR"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=__CLIENT_ID__&components=card-fields&currency=EUR&intent=authorize"></script>
 <script>
   const PAYPAL_ORDER_ID = "__PAYPAL_ORDER_ID__";
-
-  function sendToFlet(message) {
-    if (window.FletBridge && window.FletBridge.postMessage) {
-      window.FletBridge.postMessage(JSON.stringify(message));
-    }
-  }
+  const RETURN_URL = "__RETURN_URL__";
 
   async function initCardFields() {
     try {
-      // 1. Ottieni client token
+      // 1. Ottieni il client token dal backend
       const tokenRes = await fetch("/api/v1/payment/paypal/client-token");
-      const tokenData = await tokenRes.json();
-      const clientToken = tokenData.client_token;
+      if (!tokenRes.ok) throw new Error("Impossibile ottenere client token");
+      const { client_token } = await tokenRes.json();
 
-      // 2. Inizializza SDK
-      const sdk = await paypal.createInstance({ clientToken, components: ["card-fields"] });
+      // 2. Inizializza il SDK PayPal con il client token
+      const sdk = await window.paypal.createInstance({
+        clientToken: client_token,
+        components: ["card-fields"],
+      });
 
-      // 3. Crea sessione pagamento
+      // 3. Crea la sessione di pagamento
       const cardSession = sdk.createCardFieldsOneTimePaymentSession();
 
       // 4. Renderizza i campi
-      const numberField = cardSession.createCardFieldsComponent({ type: "number", placeholder: "4111 1111 1111 1111" });
-      const expiryField = cardSession.createCardFieldsComponent({ type: "expirationDate", placeholder: "MM/YY" });
-      const cvvField = cardSession.createCardFieldsComponent({ type: "cvv", placeholder: "123" });
+      const numberField = cardSession.createCardFieldsComponent({
+        type: "number",
+        placeholder: "4111 1111 1111 1111"
+      });
+      const expiryField = cardSession.createCardFieldsComponent({
+        type: "expirationDate",
+        placeholder: "MM/YY"
+      });
+      const cvvField = cardSession.createCardFieldsComponent({
+        type: "cvv",
+        placeholder: "123"
+      });
 
       document.querySelector("#card-number").appendChild(numberField);
       document.querySelector("#card-expiry").appendChild(expiryField);
@@ -93,26 +103,38 @@ CARD_CHECKOUT_HTML = """
         document.querySelector("#pay-button").disabled = !event.isValid;
       });
 
-      // 6. Gestisci submit
+      // 6. Gestisci il click su "Paga"
       document.querySelector("#pay-button").addEventListener("click", async () => {
-        document.querySelector("#error").textContent = "";
-        document.querySelector("#pay-button").disabled = true;
+        const errorEl = document.querySelector("#error");
+        errorEl.textContent = "";
+        const btn = document.querySelector("#pay-button");
+        btn.disabled = true;
+        btn.textContent = "Elaborazione...";
+
         try {
           const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
+
           if (state === "succeeded") {
-            sendToFlet({ success: true, order_id: PAYPAL_ORDER_ID });
+            // Redirect al backend per completare l'autorizzazione
+            window.location.href = RETURN_URL;
           } else if (state === "canceled") {
-            sendToFlet({ success: false, error: "Pagamento annullato" });
+            errorEl.textContent = "Pagamento annullato.";
+            btn.disabled = false;
+            btn.textContent = "Paga € __AMOUNT__";
           } else {
-            sendToFlet({ success: false, error: data?.message || "Errore" });
+            errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
+            btn.disabled = false;
+            btn.textContent = "Paga € __AMOUNT__";
           }
         } catch (err) {
-          sendToFlet({ success: false, error: err.message });
+          errorEl.textContent = "Errore: " + err.message;
+          btn.disabled = false;
+          btn.textContent = "Paga € __AMOUNT__";
         }
       });
+
     } catch (err) {
-      document.querySelector("#error").textContent = "Errore: " + err.message;
-      sendToFlet({ success: false, error: err.message });
+      document.querySelector("#error").textContent = "Errore inizializzazione: " + err.message;
     }
   }
 
@@ -145,47 +167,58 @@ def build_card_checkout_view(
     """
     import asyncio
 
-    # Sostituisci i placeholder nell'HTML
+    # URL di ritorno: il backend deve esporre un endpoint che,
+    # alla ricezione, chiama authorize_order e aggiorna l'ordine.
+    return_url = f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order_id}"
+
+    # Prepara l'HTML
     html = CARD_CHECKOUT_HTML
     html = html.replace("__CLIENT_ID__", client_id)
     html = html.replace("__PAYPAL_ORDER_ID__", paypal_order_id)
     html = html.replace("__AMOUNT__", f"{amount:.2f}")
+    html = html.replace("__RETURN_URL__", return_url)
 
-    # Stato locale
-    state = {"done": False}
+    # Polling: rileva quando l'ordine passa a "authorized"
+    done = {"value": False}
 
-    def on_js_message(e):
-        """Riceve i messaggi dal JavaScript del WebView."""
-        import json
-        try:
-            msg = json.loads(e.message_body)
-        except Exception:
-            return
+    async def poll_status():
+        max_attempts = 200  # 200 * 2s = ~6 minuti
+        for _ in range(max_attempts):
+            if done["value"]:
+                return
+            await asyncio.sleep(2)
+            status = api.get_payment_status(order_id)
+            if status.get("authorized"):
+                done["value"] = True
+                page.show_dialog(ft.SnackBar(
+                    content=ft.Text("Pagamento autorizzato!"),
+                    bgcolor=ft.Colors.GREEN_700,
+                ))
+                on_success(order_id)
+                return
 
-        if state["done"]:
-            return
-
-        if msg.get("success"):
-            state["done"] = True
+        if not done["value"]:
             page.show_dialog(ft.SnackBar(
-                content=ft.Text("Pagamento autorizzato!"),
-                bgcolor=ft.Colors.GREEN_700,
+                content=ft.Text("Timeout: pagamento non confermato."),
+                bgcolor=ft.Colors.ORANGE_700,
             ))
-            on_success(order_id)
-        else:
-            state["done"] = True
-            page.show_dialog(ft.SnackBar(
-                content=ft.Text(f"Errore: {msg.get('error', 'Sconosciuto')}"),
-                bgcolor=ft.Colors.RED_700,
-            ))
-            on_cancel()
 
-    webview = FletWebviewAll(
-        html=html,
-        javascript_channels=["FletBridge"],
-        on_javascript_message=on_js_message,
+    # WebView con HTML inline
+    webview = fwv.WebView(
+        url="about:blank",
         expand=True,
+        on_page_started=lambda e: None,
+        on_page_ended=lambda e: None,
     )
+
+    # Inietta l'HTML nel WebView usando un URL data: 
+    # (alternativa: caricare una pagina HTML servita dal backend)
+    import urllib.parse
+    data_url = "data:text/html;charset=utf-8," + urllib.parse.quote(html)
+    webview.url = data_url
+
+    # Avvia il polling
+    page.run_task(poll_status)
 
     return ft.Container(
         content=ft.Column([
@@ -197,7 +230,6 @@ def build_card_checkout_view(
             ft.Container(
                 content=webview,
                 expand=True,
-                height=600,
                 border=ft.Border.all(1, ft.Colors.GREY_300),
                 border_radius=10,
             ),

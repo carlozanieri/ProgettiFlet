@@ -1837,6 +1837,66 @@ def paypal_card_order(
     finally:
         conn.close()
 
+@app.get("/api/v1/payment/paypal/card-success")
+def paypal_card_success(order_id: int = Query(...)):
+    """
+    Riceve il redirect dal WebView dopo che il cliente ha inserito i dati carta.
+    Chiama PayPal authorize_order e aggiorna l'ordine.
+    """
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, paypal_transaction_id, status, payment_status
+                FROM orders_order WHERE id = %s
+            """, (order_id,))
+            order = cur.fetchone()
+            if not order:
+                raise HTTPException(status_code=404, detail="Ordine non trovato")
+            if order["payment_status"] == "authorized":
+                # Già autorizzato (chiamata doppia), ok
+                return {"success": True, "order_id": order_id, "status": "authorized"}
+            if not order["paypal_transaction_id"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ordine senza paypal_order_id"
+                )
+            paypal_order_id = order["paypal_transaction_id"]
+
+        # Autorizza
+        auth_id, error = paypal_service.authorize_order(paypal_order_id)
+        if error:
+            raise HTTPException(status_code=500, detail=f"Errore authorize: {error}")
+
+        # Aggiorna l'ordine
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE orders_order
+                SET status = 'authorized',
+                    payment_status = 'authorized',
+                    paypal_authorization_id = %s,
+                    updated = NOW()
+                WHERE id = %s
+            """, (auth_id, order_id))
+        conn.commit()
+
+        return {
+            "success": True,
+            "order_id": order_id,
+            "status": "authorized",
+            "paypal_authorization_id": auth_id,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     import uvicorn
