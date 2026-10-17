@@ -149,7 +149,7 @@ CARD_CHECKOUT_HTML = """
 # VISTA FLET CON WEBVIEW
 # ============================================================
 
-def build_card_checkout_view(
+async def build_card_checkout_view(
     page: ft.Page,
     api,
     order_id: int,
@@ -160,30 +160,25 @@ def build_card_checkout_view(
     on_cancel,
 ) -> ft.Container:
     """
-    Mostra il WebView con i campi carta di PayPal.
-
-    on_success: callback chiamata quando il pagamento è autorizzato
-    on_cancel: callback chiamata se l'utente annulla
+    Mostra il WebView con i campi carta di PayPal (versione asincrona).
     """
     import asyncio
-
-    # URL di ritorno: il backend deve esporre un endpoint che,
-    # alla ricezione, chiama authorize_order e aggiorna l'ordine.
-    return_url = f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order_id}"
 
     # Prepara l'HTML
     html = CARD_CHECKOUT_HTML
     html = html.replace("__CLIENT_ID__", client_id)
     html = html.replace("__PAYPAL_ORDER_ID__", paypal_order_id)
     html = html.replace("__AMOUNT__", f"{amount:.2f}")
-    html = html.replace("__RETURN_URL__", return_url)
+    html = html.replace(
+        "__RETURN_URL__",
+        f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order_id}"
+    )
 
     # Polling: rileva quando l'ordine passa a "authorized"
     done = {"value": False}
 
     async def poll_status():
-        max_attempts = 200  # 200 * 2s = ~6 minuti
-        for _ in range(max_attempts):
+        for _ in range(200):  # ~6 minuti
             if done["value"]:
                 return
             await asyncio.sleep(2)
@@ -196,21 +191,47 @@ def build_card_checkout_view(
                 ))
                 on_success(order_id)
                 return
-
         if not done["value"]:
             page.show_dialog(ft.SnackBar(
                 content=ft.Text("Timeout: pagamento non confermato."),
                 bgcolor=ft.Colors.ORANGE_700,
             ))
 
-    # WebView con HTML inline
+    # Crea il WebView
     webview = fwv.WebView(
         url="about:blank",
         expand=True,
-        enable_javascript=True,
-        on_page_started=lambda e: None,
-        on_page_ended=lambda e: None,
+        on_console_message=lambda e: print(">>> WEBVIEW CONSOLE:", e.data),
+        on_web_resource_error=lambda e: print(">>> WEBVIEW ERROR:", e.data),
     )
+
+    # Abilita JavaScript PRIMA di caricare l'HTML
+    await webview.set_javascript_mode(ft.JavaScriptMode.UNRESTRICTED)
+
+    # Carica l'HTML con i campi carta
+    await webview.load_html(html)
+
+    # Avvia il polling
+    page.run_task(poll_status)
+
+    return ft.Container(
+        content=ft.Column([
+            ft.TextButton("← Annulla e torna al carrello",
+                          on_click=lambda e: on_cancel()),
+            ft.Text("Pagamento con carta", size=24,
+                    weight=ft.FontWeight.BOLD, color=ft.Colors.BROWN_700),
+            ft.Container(height=10),
+            ft.Container(
+                content=webview,
+                expand=True,
+                border=ft.Border.all(1, ft.Colors.GREY_300),
+                border_radius=10,
+            ),
+        ], spacing=10, expand=True),
+        padding=20,
+        expand=True,
+    )
+    
 
     # Inietta l'HTML nel WebView usando un URL data: 
     # (alternativa: caricare una pagina HTML servita dal backend)
