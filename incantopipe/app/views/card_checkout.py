@@ -207,6 +207,7 @@ def build_card_checkout_view(
     webview = fwv.WebView(
         url="about:blank",
         expand=True,
+        enable_javascript=True,
         on_page_started=lambda e: None,
         on_page_ended=lambda e: None,
     )
