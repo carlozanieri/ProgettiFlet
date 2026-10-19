@@ -1799,7 +1799,7 @@ def paypal_card_order(
                     detail=f"Ordine in stato '{order['status']}', non 'pending'"
                 )
 
-            return_url = f"https://incantopipe.it/payment/card-success?order_id={order['id']}"
+            return_url = f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order['id']}"
             cancel_url = f"https://incantopipe.it/payment/card-cancel?order_id={order['id']}"
 
             # Crea ordine PayPal con intent=AUTHORIZE

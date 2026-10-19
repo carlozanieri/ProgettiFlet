@@ -165,18 +165,14 @@ def build_checkout_view(page, api, user, on_success, on_back) -> ft.Container:
                 page.update()
                 return
 
-            from views.card_checkout import build_card_checkout_view
-            content_area = page.controls[2]
-            content_area.controls.clear()
-            card_view = build_card_checkout_view(
-                page, api,
-                order_id=order_id,
-                on_success=lambda oid: on_success({"id": oid, "order_number": ""}),
-                on_cancel=lambda: on_back(),
-            )
-            content_area.controls.append(card_view)
-            page.update()
+            # Apri la pagina della carta nel BROWSER
+            url = f"https://incantopipe.it/api/v1/payment/paypal/card-page?order_id={order_id}"
+            launcher = ft.UrlLauncher()
+            page.services.append(launcher)
+            await launcher.launch_url(url)
 
+            # Mostra la schermata di attesa con polling
+            show_waiting_screen(order_id)
     # ============================================================
     # DEFINIZIONE show_waiting_screen
     # ============================================================
