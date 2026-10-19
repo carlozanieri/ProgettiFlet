@@ -149,7 +149,69 @@ CARD_CHECKOUT_HTML = """
 # VISTA FLET CON WEBVIEW
 # ============================================================
 
-async def build_card_checkout_view(
+def build_card_checkout_view(
+    page: ft.Page,
+    api,
+    order_id: int,
+    on_success,
+    on_cancel,
+) -> ft.Container:
+    """Mostra il WebView con i campi carta di PayPal (tramite URL)."""
+    import asyncio
+
+    # URL della pagina HTML servita dal backend
+    url = f"https://incantopipe.it/api/v1/payment/paypal/card-page?order_id={order_id}"
+
+    done = {"value": False}
+
+    async def poll_status():
+        for _ in range(200):
+            if done["value"]:
+                return
+            await asyncio.sleep(2)
+            status = api.get_payment_status(order_id)
+            if status.get("authorized"):
+                done["value"] = True
+                page.show_dialog(ft.SnackBar(
+                    content=ft.Text("Pagamento autorizzato!"),
+                    bgcolor=ft.Colors.GREEN_700,
+                ))
+                on_success(order_id)
+                return
+        if not done["value"]:
+            page.show_dialog(ft.SnackBar(
+                content=ft.Text("Timeout: pagamento non confermato."),
+                bgcolor=ft.Colors.ORANGE_700,
+            ))
+
+    webview = fwv.WebView(
+        url=url,
+        expand=True,
+        on_console_message=lambda e: print(">>> WEBVIEW CONSOLE:", e.data),
+        on_web_resource_error=lambda e: print(">>> WEBVIEW ERROR:", e.data),
+    )
+
+    page.run_task(poll_status)
+
+    return ft.Container(
+        content=ft.Column([
+            ft.TextButton("← Annulla e torna al carrello",
+                          on_click=lambda e: on_cancel()),
+            ft.Text("Pagamento con carta", size=24,
+                    weight=ft.FontWeight.BOLD, color=ft.Colors.BROWN_700),
+            ft.Container(height=10),
+            ft.Container(
+                content=webview,
+                expand=True,
+                border=ft.Border.all(1, ft.Colors.GREY_300),
+                border_radius=10,
+            ),
+        ], spacing=10, expand=True),
+        padding=20,
+        expand=True,
+    )
+
+async def xxbuild_card_checkout_view(
     page: ft.Page,
     api,
     order_id: int,

@@ -165,17 +165,12 @@ def build_checkout_view(page, api, user, on_success, on_back) -> ft.Container:
                 page.update()
                 return
 
-            paypal_order_id = card_data["paypal_order_id"]
-
             from views.card_checkout import build_card_checkout_view
             content_area = page.controls[2]
             content_area.controls.clear()
-            card_view = await build_card_checkout_view(
+            card_view = build_card_checkout_view(
                 page, api,
                 order_id=order_id,
-                paypal_order_id=paypal_order_id,
-                amount=data["total"],
-                client_id=config["client_id"],
                 on_success=lambda oid: on_success({"id": oid, "order_number": ""}),
                 on_cancel=lambda: on_back(),
             )

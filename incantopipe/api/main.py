@@ -1897,6 +1897,38 @@ def paypal_card_success(order_id: int = Query(...)):
     finally:
         conn.close()
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/api/v1/payment/paypal/card-page", response_class=HTMLResponse)
+def paypal_card_page(order_id: int = Query(...)):
+    """Serve la pagina HTML con i campi carta PayPal."""
+    from views.card_checkout import CARD_CHECKOUT_HTML
+    from config import PAYPAL_CLIENT_ID
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, paypal_transaction_id, total
+                FROM orders_order WHERE id = %s
+            """, (order_id,))
+            order = cur.fetchone()
+            if not order:
+                raise HTTPException(status_code=404, detail="Ordine non trovato")
+            if not order["paypal_transaction_id"]:
+                raise HTTPException(status_code=400, detail="Ordine senza paypal_order_id")
+    finally:
+        conn.close()
+
+    html = CARD_CHECKOUT_HTML
+    html = html.replace("__CLIENT_ID__", PAYPAL_CLIENT_ID)
+    html = html.replace("__PAYPAL_ORDER_ID__", order["paypal_transaction_id"])
+    html = html.replace("__AMOUNT__", f"{float(order['total']):.2f}")
+    html = html.replace(
+        "__RETURN_URL__",
+        f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order_id}"
+    )
+    return HTMLResponse(content=html)
 
 if __name__ == "__main__":
     import uvicorn
