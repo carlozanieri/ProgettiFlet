@@ -47,9 +47,7 @@ CARD_CHECKOUT_HTML = """
   <div class="label">CVV</div>
   <div class="field-container" id="card-cvv"></div>
   <div class="label">Nome titolare carta</div>
-  <input type="text" id="cardholder-name" class="field-container"
-         style="width: 100%; box-sizing: border-box;"
-         placeholder="Mario Rossi" />
+<div class="field-container" id="card-name"></div>
   <button id="pay-button" disabled>Paga € __AMOUNT__</button>
   <div id="error"></div>
   <div class="note">Pagamento sicuro gestito da PayPal</div>
@@ -95,22 +93,31 @@ CARD_CHECKOUT_HTML = """
         type: "cvv",
         placeholder: "123",
       });
-
+      const nameField = cardSession.createCardFieldsComponent({
+  type: "name",
+  placeholder: "Mario Rossi",
+});
+document.querySelector("#card-name").appendChild(nameField);
       document.querySelector("#card-number").appendChild(numberField);
       document.querySelector("#card-expiry").appendChild(expiryField);
       document.querySelector("#card-cvv").appendChild(cvvField);
 
       // 5. Abilita pulsante quando i campi sono validi
       async function updateButtonState() {
-        try {
-          const state = await cardSession.getState();
-          const allFieldsValid = Object.values(state.fields).every(f => f.isValid);
-          const nameValid = document.querySelector("#cardholder-name").value.trim().length >= 3;
-          document.querySelector("#pay-button").disabled = !(allFieldsValid && nameValid);
-        } catch (err) {
-          console.error("Errore getState:", err);
-        }
-      }
+  try {
+    const state = await cardSession.getState();
+    const allValid = Object.values(state.fields).every(f => f.isValid);
+    document.querySelector("#pay-button").disabled = !allValid;
+  } catch (err) {
+    console.error("Errore getState:", err);
+  }
+}
+
+cardSession.on("validitychange", updateButtonState);
+cardSession.on("onChange", updateButtonState);
+// Controlla subito dopo il montaggio
+setTimeout(updateButtonState, 1000);
+
 
       cardSession.on("validitychange", updateButtonState);
       cardSession.on("onChange", updateButtonState);
@@ -125,10 +132,7 @@ CARD_CHECKOUT_HTML = """
         btn.textContent = "Elaborazione...";
 
         try {
-          const cardholderName = document.querySelector("#cardholder-name").value.trim();
-            const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID, {
-              cardholderName: cardholderName,
-            });
+          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
 
           if (state === "succeeded") {
             window.location.href = RETURN_URL;
