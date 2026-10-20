@@ -98,9 +98,19 @@ CARD_CHECKOUT_HTML = """
       document.querySelector("#card-cvv").appendChild(cvvField);
 
       // 5. Abilita pulsante quando i campi sono validi
-      cardSession.on("validitychange", (event) => {
-        document.querySelector("#pay-button").disabled = !event.isValid;
-      });
+      async function updateButtonState() {
+  try {
+    const state = await cardSession.getState();
+    const allValid = Object.values(state.fields).every(f => f.isValid);
+    document.querySelector("#pay-button").disabled = !allValid;
+  } catch (err) {
+    console.error("Errore getState:", err);
+  }
+}
+
+// Ascolta i cambiamenti su ogni campo
+cardSession.on("validitychange", updateButtonState);
+cardSession.on("onChange", updateButtonState);
 
       // 6. Gestisci click "Paga"
       document.querySelector("#pay-button").addEventListener("click", async () => {
