@@ -78,6 +78,9 @@ class PayPalService:
             payload["payment_source"] = payment_source
 
         try:
+            import json as _json
+            import logging
+            logging.warning(f"PAYPAL PAYLOAD: {_json.dumps(payload, indent=2)}")
             response = requests.post(url, headers=headers, json=payload)
             if response.status_code == 201:
                 data = response.json()
