@@ -1732,7 +1732,7 @@ def paypal_config():
 
 
 @app.get("/api/v1/payment/paypal/client-token")
-def paypal_client_token(current_user: dict = Depends(get_current_user)):
+def paypal_client_token():
     """Genera un browser-safe client token per il JS SDK di PayPal."""
     import requests as req
     from config import PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_API_URL
@@ -1902,7 +1902,7 @@ from fastapi.responses import HTMLResponse
 @app.get("/api/v1/payment/paypal/card-page", response_class=HTMLResponse)
 def paypal_card_page(order_id: int = Query(...)):
     """Serve la pagina HTML con i campi carta PayPal."""
-    from views.card_checkout import CARD_CHECKOUT_HTML
+    from card_page_html import CARD_CHECKOUT_HTML
     from config import PAYPAL_CLIENT_ID
 
     conn = get_db()
