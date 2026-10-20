@@ -1804,7 +1804,8 @@ def paypal_card_order(
 
             # Crea ordine PayPal con intent=AUTHORIZE
             paypal_id, error = paypal_service.create_order(
-                order, return_url, cancel_url
+                order, return_url, cancel_url,
+                payment_source={"card": {}}
             )
             if error:
                 raise HTTPException(

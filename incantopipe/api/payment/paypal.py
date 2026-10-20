@@ -40,7 +40,7 @@ class PayPalService:
             logger.error(f"Eccezione token PayPal: {e}")
             return None
 
-    def create_order(self, order, return_url: str, cancel_url: str):
+    def create_order(self, order, return_url: str, cancel_url: str, payment_source: dict = None):
         """
         Crea un ordine PayPal con intent=AUTHORIZE.
         Ritorna (paypal_order_id, None) o (None, errore).
@@ -73,6 +73,9 @@ class PayPalService:
                 "cancel_url": cancel_url,
             },
         }
+
+        if payment_source:
+            payload["payment_source"] = payment_source
 
         try:
             response = requests.post(url, headers=headers, json=payload)
