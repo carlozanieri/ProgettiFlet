@@ -46,7 +46,10 @@ CARD_CHECKOUT_HTML = """
 
   <div class="label">CVV</div>
   <div class="field-container" id="card-cvv"></div>
-
+  <div class="label">Nome titolare carta</div>
+  <input type="text" id="cardholder-name" class="field-container"
+         style="width: 100%; box-sizing: border-box;"
+         placeholder="Mario Rossi" />
   <button id="pay-button" disabled>Paga € __AMOUNT__</button>
   <div id="error"></div>
   <div class="note">Pagamento sicuro gestito da PayPal</div>
