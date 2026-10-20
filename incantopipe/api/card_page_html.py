@@ -48,7 +48,7 @@ CARD_CHECKOUT_HTML = """
   <div class="field-container" id="card-cvv"></div>
   
     <div class="label">Nome titolare carta</div>
-  <input type="text" id="cardholder-name" class="field-container"
+    <input type="text" id="cardholder-name" class="field-container"
          style="width: 100%; box-sizing: border-box;"
          placeholder="Mario Rossi" />
 
@@ -115,6 +115,7 @@ CARD_CHECKOUT_HTML = """
 
 // Ascolta i cambiamenti su ogni campo
       // Validazione: tutti i campi carta + nome titolare
+          // Validazione: tutti i campi carta + nome titolare
       async function updateButtonState() {
         try {
           const state = await cardSession.getState();
@@ -128,8 +129,5 @@ CARD_CHECKOUT_HTML = """
 
       cardSession.on("validitychange", updateButtonState);
       cardSession.on("onChange", updateButtonState);
-      document.querySelector("#cardholder-name").addEventListener("input", updateButtonState);
-</script>
-</body>
-</html>
+      document.querySelector("#cardholder-name").addEventListener("input", updateButtonState);ml>
 """
