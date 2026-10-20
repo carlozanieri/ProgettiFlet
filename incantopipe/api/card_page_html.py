@@ -89,20 +89,16 @@ CARD_CHECKOUT_HTML = """
       document.querySelector("#card-name").appendChild(nameField);
 
       // Validazione: tutti i campi devono essere validi
-      async function updateButtonState() {
+            // Validazione: l'evento validitychange porta con sé lo stato di tutti i campi
+      cardSession.on("validitychange", (event) => {
         try {
-          const state = await cardSession.getState();
-          const allValid = Object.values(state.fields).every(f => f.isValid);
+          const fields = event.state.fields;
+          const allValid = Object.values(fields).every(f => f.isValid);
           document.querySelector("#pay-button").disabled = !allValid;
         } catch (err) {
-          console.error("Errore getState:", err);
+          console.error("Errore validazione:", err);
         }
-      }
-
-      cardSession.on("validitychange", updateButtonState);
-      cardSession.on("onChange", updateButtonState);
-      setTimeout(updateButtonState, 1000);
-
+      });
       // Click "Paga"
       document.querySelector("#pay-button").addEventListener("click", async () => {
         errorEl.textContent = "";
