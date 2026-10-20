@@ -81,7 +81,7 @@ CARD_CHECKOUT_HTML = """
 
       // 3. Crea sessione pagamento one-time
       const cardSession = sdk.createCardFieldsOneTimePaymentSession();
-
+      window.cardSession = cardSession;
       // 4. Renderizza i campi
       const numberField = cardSession.createCardFieldsComponent({
         type: "number",
