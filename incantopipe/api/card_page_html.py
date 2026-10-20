@@ -1,5 +1,5 @@
 # api/card_page_html.py
-"""HTML della pagina per i campi carta PayPal (Advanced Card Processing)."""
+"""HTML della pagina per i campi carta PayPal (Advanced Card Processing, SDK v6)."""
 
 CARD_CHECKOUT_HTML = """
 <!DOCTYPE html>
@@ -52,42 +52,57 @@ CARD_CHECKOUT_HTML = """
   <div class="note">Pagamento sicuro gestito da PayPal</div>
 </div>
 
-<script src="https://www.paypal.com/sdk/js?client-id=__CLIENT_ID__&components=card-fields&currency=EUR&intent=authorize"></script>
+<!-- SDK v6 CORE (Live) -->
+<script async src="https://www.paypal.com/web-sdk/v6/core"
+        onload="onPayPalWebSdkLoaded()"></script>
+
 <script>
   const PAYPAL_ORDER_ID = "__PAYPAL_ORDER_ID__";
   const RETURN_URL = "__RETURN_URL__";
+  const AMOUNT = "__AMOUNT__";
 
-  async function initCardFields() {
+  async function onPayPalWebSdkLoaded() {
     try {
+      // 1. Ottieni client token dal backend
       const tokenRes = await fetch("/api/v1/payment/paypal/client-token");
-      if (!tokenRes.ok) throw new Error("Impossibile ottenere client token (HTTP " + tokenRes.status + ")");
+      if (!tokenRes.ok) {
+        throw new Error("Impossibile ottenere client token (HTTP " + tokenRes.status + ")");
+      }
       const { client_token } = await tokenRes.json();
 
+      // 2. Inizializza SDK v6
       const sdk = await window.paypal.createInstance({
         clientToken: client_token,
         components: ["card-fields"],
       });
 
+      // 3. Crea sessione pagamento one-time
       const cardSession = sdk.createCardFieldsOneTimePaymentSession();
 
+      // 4. Renderizza i campi
       const numberField = cardSession.createCardFieldsComponent({
-        type: "number", placeholder: "4111 1111 1111 1111"
+        type: "number",
+        placeholder: "4111 1111 1111 1111",
       });
       const expiryField = cardSession.createCardFieldsComponent({
-        type: "expirationDate", placeholder: "MM/YY"
+        type: "expiry",
+        placeholder: "MM/YY",
       });
       const cvvField = cardSession.createCardFieldsComponent({
-        type: "cvv", placeholder: "123"
+        type: "cvv",
+        placeholder: "123",
       });
 
       document.querySelector("#card-number").appendChild(numberField);
       document.querySelector("#card-expiry").appendChild(expiryField);
       document.querySelector("#card-cvv").appendChild(cvvField);
 
+      // 5. Abilita pulsante quando i campi sono validi
       cardSession.on("validitychange", (event) => {
         document.querySelector("#pay-button").disabled = !event.isValid;
       });
 
+      // 6. Gestisci click "Paga"
       document.querySelector("#pay-button").addEventListener("click", async () => {
         const errorEl = document.querySelector("#error");
         errorEl.textContent = "";
@@ -97,29 +112,29 @@ CARD_CHECKOUT_HTML = """
 
         try {
           const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
+
           if (state === "succeeded") {
             window.location.href = RETURN_URL;
           } else if (state === "canceled") {
             errorEl.textContent = "Pagamento annullato.";
             btn.disabled = false;
-            btn.textContent = "Paga € __AMOUNT__";
+            btn.textContent = "Paga € " + AMOUNT;
           } else {
             errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
             btn.disabled = false;
-            btn.textContent = "Paga € __AMOUNT__";
+            btn.textContent = "Paga € " + AMOUNT;
           }
         } catch (err) {
           errorEl.textContent = "Errore: " + err.message;
           btn.disabled = false;
-          btn.textContent = "Paga € __AMOUNT__";
+          btn.textContent = "Paga € " + AMOUNT;
         }
       });
     } catch (err) {
-      document.querySelector("#error").textContent = "Errore inizializzazione: " + err.message;
+      document.querySelector("#error").textContent =
+        "Errore inizializzazione: " + err.message;
     }
   }
-
-  initCardFields();
 </script>
 </body>
 </html>
