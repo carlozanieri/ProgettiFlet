@@ -112,7 +112,10 @@ CARD_CHECKOUT_HTML = """
         btn.textContent = "Elaborazione...";
 
         try {
-          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
+          const cardholderName = document.querySelector("#cardholder-name").value.trim();
+          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID, {
+            cardholderName: cardholderName,
+          });
 
           if (state === "succeeded") {
             // Redirect al backend per completare l'autorizzazione
