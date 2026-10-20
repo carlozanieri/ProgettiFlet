@@ -46,6 +46,11 @@ CARD_CHECKOUT_HTML = """
 
   <div class="label">CVV</div>
   <div class="field-container" id="card-cvv"></div>
+  
+    <div class="label">Nome titolare carta</div>
+  <input type="text" id="cardholder-name" class="field-container"
+         style="width: 100%; box-sizing: border-box;"
+         placeholder="Mario Rossi" />
 
   <button id="pay-button" disabled>Paga € __AMOUNT__</button>
   <div id="error"></div>
@@ -109,42 +114,21 @@ CARD_CHECKOUT_HTML = """
 }
 
 // Ascolta i cambiamenti su ogni campo
-cardSession.on("validitychange", updateButtonState);
-cardSession.on("onChange", updateButtonState);
-
-      // 6. Gestisci click "Paga"
-      document.querySelector("#pay-button").addEventListener("click", async () => {
-        const errorEl = document.querySelector("#error");
-        errorEl.textContent = "";
-        const btn = document.querySelector("#pay-button");
-        btn.disabled = true;
-        btn.textContent = "Elaborazione...";
-
+      // Validazione: tutti i campi carta + nome titolare
+      async function updateButtonState() {
         try {
-          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
-
-          if (state === "succeeded") {
-            window.location.href = RETURN_URL;
-          } else if (state === "canceled") {
-            errorEl.textContent = "Pagamento annullato.";
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
-          } else {
-            errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
-          }
+          const state = await cardSession.getState();
+          const allFieldsValid = Object.values(state.fields).every(f => f.isValid);
+          const nameValid = document.querySelector("#cardholder-name").value.trim().length >= 3;
+          document.querySelector("#pay-button").disabled = !(allFieldsValid && nameValid);
         } catch (err) {
-          errorEl.textContent = "Errore: " + err.message;
-          btn.disabled = false;
-          btn.textContent = "Paga € " + AMOUNT;
+          console.error("Errore getState:", err);
         }
-      });
-    } catch (err) {
-      document.querySelector("#error").textContent =
-        "Errore inizializzazione: " + err.message;
-    }
-  }
+      }
+
+      cardSession.on("validitychange", updateButtonState);
+      cardSession.on("onChange", updateButtonState);
+      document.querySelector("#cardholder-name").addEventListener("input", updateButtonState);
 </script>
 </body>
 </html>
