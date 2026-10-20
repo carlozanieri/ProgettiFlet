@@ -90,13 +90,33 @@ CARD_CHECKOUT_HTML = """
 
       // Validazione: tutti i campi devono essere validi
             // Validazione: l'evento validitychange porta con sé lo stato di tutti i campi
-      cardSession.on("validitychange", (event) => {
+      // Il pulsante è sempre abilitato: la validazione la fa PayPal al submit
+      const payButton = document.querySelector("#pay-button");
+      payButton.disabled = false;
+      payButton.textContent = "Paga € " + AMOUNT;
+
+            payButton.addEventListener("click", async () => {
+        errorEl.textContent = "";
+        payButton.disabled = true;
+        payButton.textContent = "Elaborazione...";
+
         try {
-          const fields = event.state.fields;
-          const allValid = Object.values(fields).every(f => f.isValid);
-          document.querySelector("#pay-button").disabled = !allValid;
+          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
+          if (state === "succeeded") {
+            window.location.href = RETURN_URL;
+          } else if (state === "canceled") {
+            errorEl.textContent = "Pagamento annullato.";
+            payButton.disabled = false;
+            payButton.textContent = "Paga € " + AMOUNT;
+          } else {
+            errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
+            payButton.disabled = false;
+            payButton.textContent = "Paga € " + AMOUNT;
+          }
         } catch (err) {
-          console.error("Errore validazione:", err);
+          errorEl.textContent = "Errore: " + err.message;
+          payButton.disabled = false;
+          payButton.textContent = "Paga € " + AMOUNT;
         }
       });
       // Click "Paga"
