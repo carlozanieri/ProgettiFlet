@@ -101,24 +101,28 @@ CARD_CHECKOUT_HTML = """
         payButton.textContent = "Elaborazione...";
 
         try {
-          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
+          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID, {
+            contingencies: ["SCA_ALWAYS"]
+          });
           if (state === "succeeded") {
-            window.location.href = RETURN_URL;
+            // Controlla il liability shift
+            if (data.liabilityShift === "POSSIBLE" || data.liabilityShift === "YES") {
+              window.location.href = RETURN_URL;
+            } else {
+              errorEl.textContent = "Autenticazione 3D Secure non completata. Usa un'altra carta o PayPal.";
+              btn.disabled = false;
+              btn.textContent = "Paga € " + AMOUNT;
+            }
           } else if (state === "canceled") {
             errorEl.textContent = "Pagamento annullato.";
-            payButton.disabled = false;
-            payButton.textContent = "Paga € " + AMOUNT;
+            btn.disabled = false;
+            btn.textContent = "Paga € " + AMOUNT;
           } else {
             errorEl.textContent = "Errore: " + JSON.stringify(data, null, 2);
             console.error("STATO SUBMIT:", state, "DATI:", data);
-            payButton.disabled = false;
-            payButton.textContent = "Paga € " + AMOUNT;
+            btn.disabled = false;
+            btn.textContent = "Paga € " + AMOUNT;
           }
-        } catch (err) {
-          errorEl.textContent = "Errore: " + err.message;
-          payButton.disabled = false;
-          payButton.textContent = "Paga € " + AMOUNT;
-        }
       });
       // Click "Paga"
       document.querySelector("#pay-button").addEventListener("click", async () => {
@@ -130,7 +134,14 @@ CARD_CHECKOUT_HTML = """
         try {
           const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
           if (state === "succeeded") {
-            window.location.href = RETURN_URL;
+            // Controlla il liability shift
+            if (data.liabilityShift === "POSSIBLE" || data.liabilityShift === "YES") {
+              window.location.href = RETURN_URL;
+            } else {
+              errorEl.textContent = "Autenticazione 3D Secure non completata. Usa un'altra carta o PayPal.";
+              btn.disabled = false;
+              btn.textContent = "Paga € " + AMOUNT;
+            }
           } else if (state === "canceled") {
             errorEl.textContent = "Pagamento annullato.";
             btn.disabled = false;
@@ -141,11 +152,6 @@ CARD_CHECKOUT_HTML = """
             btn.disabled = false;
             btn.textContent = "Paga € " + AMOUNT;
           }
-        } catch (err) {
-          errorEl.textContent = "Errore: " + err.message;
-          btn.disabled = false;
-          btn.textContent = "Paga € " + AMOUNT;
-        }
       });
 
     } catch (err) {
