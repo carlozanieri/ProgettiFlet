@@ -7,6 +7,7 @@ from app_secrets import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, EMAIL_FR
 
 logger = logging.getLogger(__name__)
 
+
 def send_email_smtp(to_email: str, subject: str, body: str):
     """Invia un'email tramite SMTP."""
     msg = MIMEMultipart()
@@ -44,7 +45,7 @@ Totale: € {order['total']:.2f}
 Indirizzo di spedizione:
 {order['address']}, {order['postal_code']} {order['city']} ({order['province']})
 
-Ti avviseremo non appena la tua pipe sarà spedita.
+Ti avviseremo non appena la tua pipa sarà spedita.
 
 Il team di InCantoPipe
 """

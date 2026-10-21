@@ -1664,7 +1664,7 @@ def admin_ship_order(
         subject = f"Il tuo ordine #{order_num} è stato spedito! - InCantoPipe"
         body = f"""Gentile {customer_name},
 
-La tua pipe è stata spedita! 
+La tua pipa è stata spedita! 
 
 Grazie per aver scelto InCantoPipe.
 """
