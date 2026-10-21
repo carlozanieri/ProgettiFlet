@@ -983,8 +983,8 @@ def create_order(
                         """, (paypal_id, order_id))
                     
                     # Recupera gli item appena inseriti (se non li hai già in una variabile 'items')
-                    cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
-                    email_items = cur.fetchall()
+                    #cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
+                    #email_items = cur.fetchall()
                     conn2.commit()
                 finally:
                     conn2.close()
@@ -1000,7 +1000,7 @@ def create_order(
             "postal_code": order_data.postal_code,
             "city": order_data.city, 
             "province": order_data.province
-        }, email_items)
+        }, items)
         
         background_tasks.add_task(send_email_smtp, order_data.email, subject, body)
         # 8. Costruisci la risposta
