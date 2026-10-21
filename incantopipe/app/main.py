@@ -162,14 +162,14 @@ async def main(page: ft.Page):
         page.update()
 
     def go_checkout():
-        print(">>> go_checkout chiamato")
+
         if not state["user"]:
-            print(">>> utente non loggato, vado al login")
+
             go_login(from_view="checkout")
             return
-        print(">>> utente loggato, svuoto content_area")
+
         content_area.controls.clear()
-        print(">>> chiamo build_checkout_view")
+
         content_area.controls.append(
             build_checkout_view(
                 page, api,
@@ -178,9 +178,8 @@ async def main(page: ft.Page):
                 on_back=go_cart,
             )
         )
-        print(">>> build_checkout_view restituito")
+
         page.update()
-        print(">>> pagina aggiornata")
 
     def go_orders():
         if not state["user"]:

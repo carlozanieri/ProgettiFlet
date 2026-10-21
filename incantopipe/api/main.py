@@ -1944,8 +1944,8 @@ def paypal_card_page(order_id: int = Query(...)):
     )
     return HTMLResponse(content=html)
 
+
 if __name__ == "__main__":
     import uvicorn
-    print(f"🚀 InCantoPipe API su http://localhost:{API_PORT}")
-    print(f"📖 Documentazione su http://localhost:{API_PORT}/docs")
+    
     uvicorn.run(app, host=API_HOST, port=API_PORT)
