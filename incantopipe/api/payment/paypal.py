@@ -43,7 +43,7 @@ class PayPalService:
     def create_order(self, order, return_url: str, cancel_url: str, payment_source: dict = None):
         """
         Crea un ordine PayPal con intent=AUTHORIZE.
-        Ritorna (paypal_order_id, None) o (None, errore).
+        Gestisce separatamente il flusso standard (application_context) e quello con carta (payment_source).
         """
         token = self.get_access_token()
         if not token:
@@ -65,22 +65,23 @@ class PayPalService:
                     "value": f"{float(order['total']):.2f}",
                 },
             }],
-            "application_context": {
+        }
+
+        if payment_source:
+            # Flusso carta: gli URL sono già dentro payment_source.card.experience_context
+            # passato da main.py, quindi non aggiungiamo application_context
+            payload["payment_source"] = payment_source
+        else:
+            # Flusso PayPal standard: usa application_context per gli URL
+            payload["application_context"] = {
                 "brand_name": "InCantoPipe",
                 "landing_page": "NO_PREFERENCE",
                 "user_action": "PAY_NOW",
                 "return_url": return_url,
                 "cancel_url": cancel_url,
-            },
-        }
-
-        if payment_source:
-            payload["payment_source"] = payment_source
+            }
 
         try:
-            import json as _json
-            import logging
-            logging.warning(f"PAYPAL PAYLOAD: {_json.dumps(payload, indent=2)}")
             response = requests.post(url, headers=headers, json=payload)
             if response.status_code == 201:
                 data = response.json()
@@ -90,6 +91,41 @@ class PayPalService:
         except Exception as e:
             logger.error(f"Eccezione create_order: {e}")
             return None, str(e)
+
+    def get_order_status(self, paypal_order_id: str):
+        """
+        Recupera lo stato dell'ordine PayPal.
+        Ritorna (status, None) o (None, errore).
+        """
+        token = self.get_access_token()
+        if not token:
+            return None, "Impossibile ottenere token PayPal"
+
+        url = f"{self.api_url}/v2/checkout/orders/{paypal_order_id}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("status"), None
+            logger.error(f"Errore get_order_status: {response.status_code} - {response.text}")
+            return None, response.text
+        except Exception as e:
+            logger.error(f"Eccezione get_order_status: {e}")
+            return None, str(e)
+
+    def get_approve_url(self, paypal_order_id: str) -> str | None:
+        """
+        Restituisce l'URL di approvazione PayPal per il flusso standard.
+        """
+        mode = "sandbox" if "sandbox" in self.api_url else "www"
+        if mode == "sandbox":
+            return f"https://www.sandbox.paypal.com/checkoutnow?token={paypal_order_id}"
+        return f"https://www.paypal.com/checkoutnow?token={paypal_order_id}"
 
     def authorize_order(self, paypal_order_id: str):
         """
@@ -168,42 +204,6 @@ class PayPalService:
             logger.error(f"Eccezione void: {e}")
             return False, str(e)
 
-    def get_order_status(self, paypal_order_id: str) -> tuple:
-        """
-        Recupera lo stato dell'ordine PayPal.
-        Ritorna (status, None) o (None, errore).
-        Status possibili: CREATED, SAVED, APPROVED, VOIDED, COMPLETED, PAYER_ACTION_REQUIRED
-        """
-        token = self.get_access_token()
-        if not token:
-            return None, "Impossibile ottenere token PayPal"
-
-        url = f"{self.api_url}/v2/checkout/orders/{paypal_order_id}"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
-        }
-
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("status"), None
-            logger.error(f"Errore get_order_status: {response.status_code} - {response.text}")
-            return None, response.text
-        except Exception as e:
-            logger.error(f"Eccezione get_order_status: {e}")
-            return None, str(e)
-
-    def get_approve_url(self, paypal_order_id: str) -> str | None:
-        """
-        Restituisce l'URL di approvazione PayPal.
-        È semplicemente l'URL standard di checkout con il token.
-        """
-        mode = "sandbox" if "sandbox" in self.api_url else "www"
-        if mode == "sandbox":
-            return f"https://www.sandbox.paypal.com/checkoutnow?token={paypal_order_id}"
-        return f"https://www.paypal.com/checkoutnow?token={paypal_order_id}"
 
 # Istanza globale
 paypal_service = PayPalService()
