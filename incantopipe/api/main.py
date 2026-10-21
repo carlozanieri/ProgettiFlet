@@ -1606,18 +1606,21 @@ def admin_list_orders(
 @app.post("/api/v1/admin/orders/{order_id}/ship")
 def admin_ship_order(
     order_id: int,
-    background_tasks: BackgroundTasks, 
+    background_tasks: BackgroundTasks,  # <-- Assicurati che ci sia
     current_user: dict = Depends(get_current_admin),
 ):
     """Cattura il pagamento PayPal e marca l'ordine come spedito."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
+            # 1. Recupera l'ordine e verifica lo stato
             cur.execute("""
-                SELECT id, status, payment_status, paypal_authorization_id
+                SELECT id, status, payment_status, paypal_authorization_id,
+                       first_name, last_name, email, order_number
                 FROM orders_order WHERE id = %s
             """, (order_id,))
             order = cur.fetchone()
+            
             if not order:
                 raise HTTPException(status_code=404, detail="Ordine non trovato")
             if order["status"] != "authorized":
@@ -1632,12 +1635,17 @@ def admin_ship_order(
                 )
             auth_id = order["paypal_authorization_id"]
 
-        # 1. Cattura il pagamento PayPal
+            # Dati per l'email da usare dopo
+            customer_email = order["email"]
+            customer_name = order["first_name"]
+            order_num = order["order_number"]
+
+        # 2. Cattura il pagamento su PayPal
         capture_id, error = paypal_service.capture_authorization(auth_id)
         if error:
             raise HTTPException(status_code=500, detail=f"Errore capture: {error}")
 
-        # 2. Aggiorna l'ordine
+        # 3. Aggiorna l'ordine nel database
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE orders_order
@@ -1649,7 +1657,18 @@ def admin_ship_order(
                     updated = NOW()
                 WHERE id = %s
             """, (capture_id, order_id))
-        conn.commit()
+        
+        conn.commit() # <-- Commit prima di inviare l'email
+
+        # 4. Invia l'email di spedizione in background
+        subject = f"Il tuo ordine #{order_num} è stato spedito! - InCantoPipe"
+        body = f"""Gentile {customer_name},
+
+La tua pipe è stata spedita! 
+
+Grazie per aver scelto InCantoPipe.
+"""
+        background_tasks.add_task(send_email_smtp, customer_email, subject, body)
 
         return {
             "success": True,
