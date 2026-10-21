@@ -88,14 +88,11 @@ CARD_CHECKOUT_HTML = """
       document.querySelector("#card-cvv").appendChild(cvvField);
       document.querySelector("#card-name").appendChild(nameField);
 
-      // Validazione: tutti i campi devono essere validi
-            // Validazione: l'evento validitychange porta con sé lo stato di tutti i campi
-      // Il pulsante è sempre abilitato: la validazione la fa PayPal al submit
       const payButton = document.querySelector("#pay-button");
       payButton.disabled = false;
       payButton.textContent = "Paga € " + AMOUNT;
 
-            payButton.addEventListener("click", async () => {
+      payButton.addEventListener("click", async () => {
         errorEl.textContent = "";
         payButton.disabled = true;
         payButton.textContent = "Elaborazione...";
@@ -104,54 +101,30 @@ CARD_CHECKOUT_HTML = """
           const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID, {
             contingencies: ["SCA_ALWAYS"]
           });
-          if (state === "succeeded") {
-            // Controlla il liability shift
-            if (data.liabilityShift === "POSSIBLE" || data.liabilityShift === "YES") {
-              window.location.href = RETURN_URL;
-            } else {
-              errorEl.textContent = "Autenticazione 3D Secure non completata. Usa un'altra carta o PayPal.";
-              btn.disabled = false;
-              btn.textContent = "Paga € " + AMOUNT;
-            }
-          } else if (state === "canceled") {
-            errorEl.textContent = "Pagamento annullato.";
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
-          } else {
-            errorEl.textContent = "Errore: " + JSON.stringify(data, null, 2);
-            console.error("STATO SUBMIT:", state, "DATI:", data);
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
-          }
-      });
-      // Click "Paga"
-      document.querySelector("#pay-button").addEventListener("click", async () => {
-        errorEl.textContent = "";
-        const btn = document.querySelector("#pay-button");
-        btn.disabled = true;
-        btn.textContent = "Elaborazione...";
 
-        try {
-          const { state, data } = await cardSession.submit(PAYPAL_ORDER_ID);
           if (state === "succeeded") {
-            // Controlla il liability shift
             if (data.liabilityShift === "POSSIBLE" || data.liabilityShift === "YES") {
               window.location.href = RETURN_URL;
             } else {
               errorEl.textContent = "Autenticazione 3D Secure non completata. Usa un'altra carta o PayPal.";
-              btn.disabled = false;
-              btn.textContent = "Paga € " + AMOUNT;
+              payButton.disabled = false;
+              payButton.textContent = "Paga € " + AMOUNT;
             }
           } else if (state === "canceled") {
             errorEl.textContent = "Pagamento annullato.";
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
+            payButton.disabled = false;
+            payButton.textContent = "Paga € " + AMOUNT;
           } else {
             errorEl.textContent = "Errore: " + JSON.stringify(data, null, 2);
             console.error("STATO SUBMIT:", state, "DATI:", data);
-            btn.disabled = false;
-            btn.textContent = "Paga € " + AMOUNT;
+            payButton.disabled = false;
+            payButton.textContent = "Paga € " + AMOUNT;
           }
+        } catch (err) {
+          errorEl.textContent = "Errore: " + err.message;
+          payButton.disabled = false;
+          payButton.textContent = "Paga € " + AMOUNT;
+        }
       });
 
     } catch (err) {
