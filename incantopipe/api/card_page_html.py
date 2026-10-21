@@ -109,7 +109,8 @@ CARD_CHECKOUT_HTML = """
             payButton.disabled = false;
             payButton.textContent = "Paga € " + AMOUNT;
           } else {
-            errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
+            errorEl.textContent = "Errore: " + JSON.stringify(data, null, 2);
+            console.error("STATO SUBMIT:", state, "DATI:", data);
             payButton.disabled = false;
             payButton.textContent = "Paga € " + AMOUNT;
           }
@@ -135,7 +136,8 @@ CARD_CHECKOUT_HTML = """
             btn.disabled = false;
             btn.textContent = "Paga € " + AMOUNT;
           } else {
-            errorEl.textContent = "Errore: " + (data?.message || "Sconosciuto");
+            errorEl.textContent = "Errore: " + JSON.stringify(data, null, 2);
+            console.error("STATO SUBMIT:", state, "DATI:", data);
             btn.disabled = false;
             btn.textContent = "Paga € " + AMOUNT;
           }
