@@ -23,6 +23,8 @@ from auth import (
     get_current_admin,          # ← AGGIUNGI
     hash_password,
 )
+from fastapi import BackgroundTasks
+from email_service import send_email_smtp, send_order_confirmation_email
 
 # ==========================
 # MODELLI PYDANTIC
@@ -869,6 +871,7 @@ def generate_order_number() -> str:
 @app.post("/api/v1/orders", response_model=OrderResponse)
 def create_order(
     order_data: OrderCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
     """Crea un ordine dal carrello e avvia l'autorizzazione PayPal."""
@@ -978,11 +981,28 @@ def create_order(
                             SET paypal_transaction_id = %s, updated = NOW()
                             WHERE id = %s
                         """, (paypal_id, order_id))
+                    
+                    # Recupera gli item appena inseriti (se non li hai già in una variabile 'items')
+                    cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
+                    email_items = cur.fetchall()
                     conn2.commit()
                 finally:
                     conn2.close()
                 paypal_order_id = paypal_id
-
+                # --- INIZIO BLOCCO EMAIL ---
+        # Prepara e accoda l'email di conferma al cliente
+        subject, body = send_order_confirmation_email({
+            "order_number": order_number, 
+            "first_name": order_data.first_name,
+            "last_name": order_data.last_name, 
+            "total": total,
+            "address": order_data.address, 
+            "postal_code": order_data.postal_code,
+            "city": order_data.city, 
+            "province": order_data.province
+        }, email_items)
+        
+        background_tasks.add_task(send_email_smtp, order_data.email, subject, body)
         # 8. Costruisci la risposta
         return {
             "id": order_id,
@@ -1586,6 +1606,7 @@ def admin_list_orders(
 @app.post("/api/v1/admin/orders/{order_id}/ship")
 def admin_ship_order(
     order_id: int,
+    background_tasks: BackgroundTasks, 
     current_user: dict = Depends(get_current_admin),
 ):
     """Cattura il pagamento PayPal e marca l'ordine come spedito."""
