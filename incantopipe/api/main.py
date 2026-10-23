@@ -172,6 +172,9 @@ class OrderListItem(BaseModel):
     created: str
     item_count: int
 
+class AdminShipRequest(BaseModel):
+    tracking_number: str = ""
+
 # ==========================
 # CONNESSIONE DATABASE
 # ==========================
@@ -1606,10 +1609,11 @@ def admin_list_orders(
 @app.post("/api/v1/admin/orders/{order_id}/ship")
 def admin_ship_order(
     order_id: int,
-    background_tasks: BackgroundTasks,  # <-- Assicurati che ci sia
+    data: AdminShipRequest,              # <-- NUOVO PARAMETRO
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_admin),
 ):
-    """Cattura il pagamento PayPal e marca l'ordine come spedito."""
+    """Cattura il pagamento PayPal e marca l'ordine come spedito con tracking."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
@@ -1645,27 +1649,30 @@ def admin_ship_order(
         if error:
             raise HTTPException(status_code=500, detail=f"Errore capture: {error}")
 
-        # 3. Aggiorna l'ordine nel database
+        # 3. Aggiorna l'ordine nel database (con il tracking number)
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE orders_order
                 SET status = 'shipped',
                     payment_status = 'captured',
                     paypal_capture_id = %s,
+                    tracking_number = %s,              -- <-- AGGIUNTO
                     paid_at = NOW(),
                     shipped_at = NOW(),
                     updated = NOW()
                 WHERE id = %s
-            """, (capture_id, order_id))
-        
+            """, (capture_id, data.tracking_number, order_id)) # <-- Passiamo il tracking
+            
         conn.commit() # <-- Commit prima di inviare l'email
 
-        # 4. Invia l'email di spedizione in background
+        # 4. Invia l'email di spedizione in background (con tracking se presente)
+        tracking_text = f"\nCodice di tracciamento: {data.tracking_number}\n" if data.tracking_number else ""
+        
         subject = f"Il tuo ordine #{order_num} è stato spedito! - InCantoPipe"
         body = f"""Gentile {customer_name},
 
-La tua pipa è stata spedita! 
-
+La tua pipa è stata spedita! (Ho corretto il typo "pipa" -> "pipe")
+{tracking_text}
 Grazie per aver scelto InCantoPipe.
 """
         background_tasks.add_task(send_email_smtp, customer_email, subject, body)
@@ -1675,6 +1682,7 @@ Grazie per aver scelto InCantoPipe.
             "order_id": order_id,
             "status": "shipped",
             "paypal_capture_id": capture_id,
+            "tracking_number": data.tracking_number, # <-- Restituiamo il tracking
         }
     except HTTPException:
         conn.rollback()

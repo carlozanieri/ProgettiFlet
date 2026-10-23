@@ -289,10 +289,13 @@ class APIClient:
         except httpx.HTTPError:
             return []
 
-    def admin_ship_order(self, order_id: int) -> tuple:
-        """Cattura il pagamento e marca l'ordine come spedito."""
+    def admin_ship_order(self, order_id: int, tracking_number: str = "") -> tuple:
+        """Cattura il pagamento e marca l'ordine come spedito con tracking."""
         try:
-            r = self.client.post(f"{self.base_url}/admin/orders/{order_id}/ship")
+            r = self.client.post(
+                f"{self.base_url}/admin/orders/{order_id}/ship",
+                json={"tracking_number": tracking_number}
+            )
             if r.status_code == 200:
                 return True, r.json()
             else:

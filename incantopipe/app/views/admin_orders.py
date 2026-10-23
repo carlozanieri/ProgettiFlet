@@ -277,23 +277,52 @@ def build_admin_order_detail_view(
 
     # ---- Azioni admin ----
     def do_ship(e):
-        error_text.visible = False
-        loading.visible = True
-        page.update()
+        # Apriamo un dialog per chiedere il tracking number
+        tracking_field = ft.TextField(
+            label="Codice di Tracciamento (opzionale)",
+            hint_text="es. 123456789",
+            width=300,
+        )
+        error_dialog = ft.Text("", color=ft.Colors.RED_700, size=12, visible=False)
 
-        success, result = api.admin_ship_order(order_id)
-        loading.visible = False
-
-        if success:
-            page.show_dialog(ft.SnackBar(
-                content=ft.Text("Ordine spedito e pagamento incassato"),
-                bgcolor=ft.Colors.GREEN_700,
-            ))
-            on_ship_done(order_id)
-        else:
-            error_text.value = f"Errore: {result}"
-            error_text.visible = True
+        def confirm_ship(ev):
+            page.pop_dialog()
+            error_text.visible = False
+            loading.visible = True
             page.update()
+
+            # Chiamata API con il tracking number
+            success, result = api.admin_ship_order(order_id, tracking_field.value.strip())
+            loading.visible = False
+
+            if success:
+                page.show_dialog(ft.SnackBar(
+                    content=ft.Text("Ordine spedito e pagamento incassato"),
+                    bgcolor=ft.Colors.GREEN_700,
+                ))
+                on_ship_done(order_id)
+            else:
+                error_text.value = f"Errore: {result}"
+                error_text.visible = True
+                page.update()
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Spedisci ordine"),
+            content=ft.Column([
+                ft.Text("Inserisci il codice di tracciamento per il cliente (opzionale)."),
+                tracking_field,
+                error_dialog,
+            ], tight=True, spacing=10),
+            actions=[
+                ft.TextButton("Annulla", on_click=lambda e: page.pop_dialog()),
+                ft.Button(
+                    content=ft.Text("Conferma e Incassa"),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE),
+                    on_click=confirm_ship,
+                ),
+            ],
+        )
+        page.show_dialog(dialog)
 
     def do_cancel(e):
         def confirm_cancel(ev):
