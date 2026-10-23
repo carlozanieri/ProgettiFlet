@@ -904,7 +904,7 @@ def create_order(
             # 3. Totale
             total = sum(float(item["price"]) * item["quantity"] for item in items)
 
-            # 4. Crea l'ordine in stato pending
+            # 4. Crea l'ordine nel database
             order_number = generate_order_number()
             cur.execute("""
                 INSERT INTO orders_order (
@@ -954,94 +954,110 @@ def create_order(
                 WHERE id = %s
             """, (cart_id,))
 
+        # ---> PRIMO COMMIT: L'ordine esiste nel database in stato pending <---
         conn.commit()
 
-        # 7. Se il metodo è PayPal, avvia l'autorizzazione
+        # 7. Se il metodo di pagamento richiede PayPal, avvia l'autorizzazione
         paypal_order_id = None
-        if order_data.payment_method == "paypal":
-            order_for_paypal = {
-                "id": order_id,
-                "order_number": order_number,
-                "total": total,
-            }
-            return_url = f"https://incantopipe.it/payment/success?order_id={order_id}"
+        if order_data.payment_method in ("paypal", "credit_card"):
+            return_url = f"https://incantopipe.it/api/v1/payment/paypal/card-success?order_id={order_id}" if order_data.payment_method == "credit_card" else f"https://incantopipe.it/payment/success?order_id={order_id}"
             cancel_url = f"https://incantopipe.it/payment/cancel?order_id={order_id}"
-
-            paypal_id, error = paypal_service.create_order(
-                order_for_paypal, return_url, cancel_url
-            )
-            if error:
-                # L'ordine esiste, ma PayPal ha fallito. Logghiamo e proseguiamo.
-                import logging
-                logging.error(f"Errore PayPal authorize per ordine {order_id}: {error}")
+            
+            # Per il flusso carta usiamo payment_source={"card": ...}, per PayPal standard nessun payment_source
+            if order_data.payment_method == "credit_card":
+                payment_source = {
+                    "card": {
+                        "attributes": {
+                            "verification": {"method": "SCA_ALWAYS"}
+                        },
+                        "experience_context": {
+                            "return_url": return_url,
+                            "cancel_url": cancel_url,
+                            "shipping_preference": "NO_SHIPPING",
+                        }
+                    }
+                }
             else:
-                # Salva il paypal_order_id nell'ordine
-                conn2 = get_db()
-                try:
-                    with conn2.cursor() as cur2:
-                        cur2.execute("""
-                            UPDATE orders_order
-                            SET paypal_transaction_id = %s, updated = NOW()
-                            WHERE id = %s
-                        """, (paypal_id, order_id))
-                    
-                    # Recupera gli item appena inseriti (se non li hai già in una variabile 'items')
-                    #cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
-                    #email_items = cur.fetchall()
-                    conn2.commit()
-                finally:
-                    conn2.close()
-                paypal_order_id = paypal_id
-                # --- INIZIO BLOCCO EMAIL ---
-        # Prepara e accoda l'email di conferma al cliente
-        subject, body = send_order_confirmation_email({
-            "order_number": order_number, 
-            "first_name": order_data.first_name,
-            "last_name": order_data.last_name, 
-            "total": total,
-            "address": order_data.address, 
-            "postal_code": order_data.postal_code,
-            "city": order_data.city, 
-            "province": order_data.province
-        }, items)
-        
-        background_tasks.add_task(send_email_smtp, order_data.email, subject, body)
-        # 8. Costruisci la risposta
+                payment_source = None
+
+            # Chiamata a PayPal
+            order_for_paypal = {"id": order_id, "order_number": order_number, "total": total}
+            paypal_id, error = paypal_service.create_order(
+                order_for_paypal, return_url, cancel_url, payment_source=payment_source
+            )
+            
+            if error:
+                # Se PayPal fallisce, l'ordine resta pending nel DB (lo scheduler lo pulirà)
+                raise HTTPException(status_code=500, detail=f"Errore PayPal: {error}")
+            
+            paypal_order_id = paypal_id
+
+            # 8. Aggiorna l'ordine con il paypal_order_id
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE orders_order
+                    SET paypal_transaction_id = %s, updated = NOW()
+                    WHERE id = %s
+                """, (paypal_order_id, order_id))
+            
+            # ---> SECONDO COMMIT: Salviamo l'ID PayPal <---
+            conn.commit()
+
+        # 9. ---> LEGGIAMO I DATI DAL DATABASE PER LA RISPOSTA <---
+        # Questo garantisce che la risposta rispecchi esattamente ciò che è nel DB
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, order_number, status, payment_status, payment_method,
+                       total, shipping_cost, first_name, last_name, email, phone,
+                       address, postal_code, city, province, country, shipping_notes,
+                       created, paid_at, shipped_at, delivered_at, paypal_transaction_id
+                FROM orders_order WHERE id = %s
+            """, (order_id,))
+            db_order = cur.fetchone()
+
+            cur.execute("""
+                SELECT id, product_id, product_name, price, quantity
+                FROM orders_orderitem WHERE order_id = %s
+            """, (order_id,))
+            db_items = cur.fetchall()
+
+        # 10. Costruisci la risposta usando i dati letti dal DB
         return {
-            "id": order_id,
-            "order_number": order_number,
-            "status": "pending",
-            "payment_status": "pending",
-            "payment_method": order_data.payment_method,
-            "total": float(total),
-            "shipping_cost": 0.0,
-            "first_name": order_data.first_name,
-            "last_name": order_data.last_name,
-            "email": order_data.email,
-            "phone": order_data.phone,
-            "address": order_data.address,
-            "postal_code": order_data.postal_code,
-            "city": order_data.city,
-            "province": order_data.province,
-            "country": order_data.country,
-            "shipping_notes": order_data.shipping_notes,
-            "created": created.isoformat(),
-            "paid_at": None,
-            "shipped_at": None,
-            "delivered_at": None,
-            "paypal_order_id": paypal_order_id,      # ← AGGIUNTO
+            "id": db_order["id"],
+            "order_number": db_order["order_number"],
+            "status": db_order["status"],
+            "payment_status": db_order["payment_status"],
+            "payment_method": db_order["payment_method"],
+            "total": float(db_order["total"]),
+            "shipping_cost": float(db_order["shipping_cost"]),
+            "first_name": db_order["first_name"],
+            "last_name": db_order["last_name"],
+            "email": db_order["email"],
+            "phone": db_order["phone"],
+            "address": db_order["address"],
+            "postal_code": db_order["postal_code"],
+            "city": db_order["city"],
+            "province": db_order["province"],
+            "country": db_order["country"],
+            "shipping_notes": db_order["shipping_notes"],
+            "created": db_order["created"].isoformat(),
+            "paid_at": db_order["paid_at"].isoformat() if db_order["paid_at"] else None,
+            "shipped_at": db_order["shipped_at"].isoformat() if db_order["shipped_at"] else None,
+            "delivered_at": db_order["delivered_at"].isoformat() if db_order["delivered_at"] else None,
+            "paypal_order_id": db_order["paypal_transaction_id"],  # <-- Letto dal DB
             "items": [
                 {
-                    "id": 0,
-                    "product_id": item["product_id"],
-                    "product_name": item["product_name"],
-                    "price": float(item["price"]),
-                    "quantity": item["quantity"],
-                    "total": float(item["price"]) * item["quantity"],
+                    "id": i["id"],
+                    "product_id": i["product_id"],
+                    "product_name": i["product_name"],
+                    "price": float(i["price"]),
+                    "quantity": i["quantity"],
+                    "total": float(i["price"]) * i["quantity"],
                 }
-                for item in items
+                for i in db_items
             ],
         }
+
     except HTTPException:
         conn.rollback()
         raise
