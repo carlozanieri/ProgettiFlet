@@ -202,3 +202,5 @@ Secret key 1:  EB2Sksvbt0z4gU0ZR6MFjxzcWQFk92Qp7jYNBywcndPlTqg-xVoPHVwEqfmngKaRB
 
 Riflettendo, ho pensato che, per il momento, preferirei proseguire soltanto con paypal, ma prima dimmi se è possibile procedere come segue:
 - al momento della conferma ordine il cliente ha la possibilità di scegliere il pagamento con PayPal o carte; nel primo caso, pagamento con paypal, funziona come visto fino ad adesso, pagamento dal conto paypal; nel secondo caso, pagamento con carte, viene reindirizzato alla procedura di paypal prevista per il pagamento con carte.
+
+Sostanzialmente funziona tutto anche su android, ma, con le ultime modifiche, abbiamo introdotto due problemi, uno formale ed uno sostanziale: 1) al momento della conferma dell'ordine la E-Mail non viene spedita, viene inviata solo al momento della spedizione. 2) Hai introdotto questo:  "La tua pipa è stata spedita! (Ho corretto il typo "pipa" -> "pipe"), a parte che questo appare anche nell'E-Mail inviata al cliente, è proprio la correzione che è sbagliata: in italiano "pipe" è il plurale di "pipa" e non ha niente a che vedere con l'inglese "pipe".

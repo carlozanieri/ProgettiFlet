@@ -36,6 +36,7 @@ class RegisterResponse(BaseModel):
     user_id: int
     username: str
 
+
 class Category(BaseModel):
     id: int
     name: str

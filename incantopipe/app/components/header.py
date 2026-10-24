@@ -30,31 +30,45 @@ def build_header(
         display_name = user.get("first_name") or user.get("username", "Utente")
         is_staff = user.get("is_staff", False)
 
-        items = [
-            ft.Text(f"Ciao, {display_name}", size=12),
-            ft.TextButton(
-                "Ordini",
+        # Usiamo un PopupMenuButton: su mobile è molto meglio perché occupa meno spazio
+        menu_items = [
+            ft.PopupMenuItem(
+                content=ft.Text(f"Ciao, {display_name}"),
+                disabled=True,
+            ),
+            ft.PopupMenuItem(),  # separatore
+            ft.PopupMenuItem(
+                content=ft.Text("I miei ordini"),
+                icon=ft.Icons.RECEIPT_LONG,
                 on_click=lambda e: on_orders_click() if on_orders_click else None,
             ),
         ]
 
         if is_staff and on_admin_click:
-            items.append(
-                ft.TextButton(
-                    "Admin",
+            menu_items.append(
+                ft.PopupMenuItem(
+                    content=ft.Text("Admin"),
+                    icon=ft.Icons.ADMIN_PANEL_SETTINGS,
                     on_click=lambda e: on_admin_click(),
                 )
             )
 
-        items.append(
-            ft.TextButton(
-                "Logout",
+        menu_items.append(
+            ft.PopupMenuItem(
+                content=ft.Text("Logout"),
+                icon=ft.Icons.LOGOUT,
                 on_click=lambda e: on_logout_click() if on_logout_click else None,
             )
         )
 
-        user_block = ft.Row(items, spacing=5)
+        user_block = ft.PopupMenuButton(
+            items=menu_items,
+            icon=ft.Icons.ACCOUNT_CIRCLE,
+            icon_color=ft.Colors.BROWN_700,
+        )
     else:
+        # Su mobile i due pulsanti affiancati potrebbero non entrare.
+        # Usiamo un Row che va a capo se necessario (wrap=True) ma solo per i pulsanti
         user_block = ft.Row([
             ft.TextButton(
                 "Accedi",
@@ -64,28 +78,36 @@ def build_header(
                 "Registrati",
                 on_click=lambda e: on_register_click() if on_register_click else None,
             ),
-        ], spacing=5)
+        ], spacing=5, wrap=True)
 
     return ft.Container(
-        content=ft.Row([
-            ft.TextButton(
-                "InCantoPipe",
-                on_click=on_home_click,
-                style=ft.ButtonStyle(color=ft.Colors.BROWN_700),
-            ),
-            ft.Row([
-                ft.IconButton(
-                    icon=ft.Icons.SHOPPING_CART,
-                    icon_color=ft.Colors.BROWN_700,
-                    on_click=on_cart_click,
-                    tooltip="Carrello",
+        content=ft.ResponsiveRow([
+            # Colonna sinistra: Logo
+            ft.Container(
+                content=ft.TextButton(
+                    "InCantoPipe",
+                    on_click=on_home_click,
+                    style=ft.ButtonStyle(color=ft.Colors.BROWN_700),
                 ),
-                cart_badge,
-                ft.Container(width=10),
-                user_block,
-            ], spacing=0),
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        padding=ft.Padding.symmetric(vertical=15, horizontal=10),
+                col={"xs": 6, "sm": 6, "md": 6}, # Prende metà schermo su mobile
+            ),
+            # Colonna destra: Carrello + Menu Utente
+            ft.Container(
+                content=ft.Row([
+                    ft.IconButton(
+                        icon=ft.Icons.SHOPPING_CART,
+                        icon_color=ft.Colors.BROWN_700,
+                        on_click=on_cart_click,
+                        tooltip="Carrello",
+                    ),
+                    cart_badge,
+                    user_block,
+                ], alignment=ft.MainAxisAlignment.END, spacing=5),
+                col={"xs": 6, "sm": 6, "md": 6},
+                alignment=ft.Alignment.CENTER_RIGHT,
+            ),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, spacing=0, run_spacing=0),
+        padding=ft.Padding.symmetric(vertical=10, horizontal=10),
     )
 
 
