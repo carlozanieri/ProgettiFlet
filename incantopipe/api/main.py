@@ -1440,14 +1440,10 @@ def paypal_void(
 @app.get("/api/v1/payment/paypal/status/{order_id}")
 def paypal_status(
     order_id: int,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    Verifica lo stato dell'ordine PayPal.
-
-    - Se PayPal dice APPROVED → chiama authorize_order e aggiorna l'ordine a "authorized"
-    - Restituisce lo stato attuale dell'ordine.
-    """
+    """Verifica lo stato dell'ordine PayPal e autorizza se approvato."""
     user_id = current_user["user_id"]
     conn = get_db()
     try:
@@ -1461,21 +1457,14 @@ def paypal_status(
             if not order:
                 raise HTTPException(status_code=404, detail="Ordine non trovato")
 
-            # Se è già authorized, ritorna lo stato senza fare altro
             if order["payment_status"] == "authorized":
                 return {
-                    "order_id": order_id,
-                    "status": order["status"],
-                    "payment_status": order["payment_status"],
-                    "authorized": True,
+                    "order_id": order_id, "status": order["status"],
+                    "payment_status": order["payment_status"], "authorized": True,
                 }
 
-            # Se non ha paypal_order_id, errore
             if not order["paypal_transaction_id"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Ordine senza paypal_order_id"
-                )
+                raise HTTPException(status_code=400, detail="Ordine senza paypal_order_id")
 
             paypal_order_id = order["paypal_transaction_id"]
 
@@ -1490,45 +1479,51 @@ def paypal_status(
             if error:
                 raise HTTPException(status_code=500, detail=f"Errore authorize: {error}")
 
-            # Aggiorna l'ordine
+            # 3. Aggiorna l'ordine e recupera i dati per l'email
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE orders_order
-                    SET status = 'authorized',
-                        payment_status = 'authorized',
-                        paypal_authorization_id = %s,
-                        updated = NOW()
+                    SET status = 'authorized', payment_status = 'authorized',
+                        paypal_authorization_id = %s, updated = NOW()
                     WHERE id = %s
                 """, (auth_id, order_id))
+                
+                cur.execute("""
+                    SELECT email, first_name, last_name, order_number, total, 
+                           address, postal_code, city, province 
+                    FROM orders_order WHERE id = %s
+                """, (order_id,))
+                order_info = cur.fetchone()
+                
+                cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
+                items = cur.fetchall()
+                
             conn.commit()
 
+            # ---> INVIO EMAIL DI CONFERMA (solo ora che è authorized) <---
+            if order_info:
+                subject, body = send_order_confirmation_email(order_info, items)
+                background_tasks.add_task(send_email_smtp, order_info['email'], subject, body)
+
             return {
-                "order_id": order_id,
-                "status": "authorized",
-                "payment_status": "authorized",
-                "authorized": True,
+                "order_id": order_id, "status": "authorized",
+                "payment_status": "authorized", "authorized": True,
                 "paypal_authorization_id": auth_id,
             }
 
-        # 3. Stato ancora CREATED / SAVED → non ancora approvato
         return {
-            "order_id": order_id,
-            "status": order["status"],
+            "order_id": order_id, "status": order["status"],
             "payment_status": order["payment_status"],
-            "paypal_status": pp_status,
-            "authorized": False,
+            "paypal_status": pp_status, "authorized": False,
         }
     except HTTPException:
         conn.rollback()
         raise
     except Exception as e:
         conn.rollback()
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
     finally:
         conn.close()
-
 
 class AdminOrderItemResponse(BaseModel):
     id: int
@@ -1687,7 +1682,7 @@ def admin_ship_order(
         subject = f"Il tuo ordine #{order_num} è stato spedito! - InCantoPipe"
         body = f"""Gentile {customer_name},
 
-La tua pipa è stata spedita! (Ho corretto il typo "pipa" -> "pipe")
+La tua pipa è stata spedita! 
 {tracking_text}
 Grazie per aver scelto InCantoPipe.
 """
@@ -1916,11 +1911,11 @@ def paypal_card_order(
         conn.close()
 
 @app.get("/api/v1/payment/paypal/card-success")
-def paypal_card_success(order_id: int = Query(...)):
-    """
-    Riceve il redirect dal WebView dopo che il cliente ha inserito i dati carta.
-    Chiama PayPal authorize_order e aggiorna l'ordine.
-    """
+def paypal_card_success(
+    background_tasks: BackgroundTasks,
+    order_id: int = Query(...),
+):
+    """Riceve il redirect dopo il pagamento con carta e autorizza."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
@@ -1931,46 +1926,55 @@ def paypal_card_success(order_id: int = Query(...)):
             order = cur.fetchone()
             if not order:
                 raise HTTPException(status_code=404, detail="Ordine non trovato")
+            
             if order["payment_status"] == "authorized":
-                # Già autorizzato (chiamata doppia), ok
                 return {"success": True, "order_id": order_id, "status": "authorized"}
+            
             if not order["paypal_transaction_id"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Ordine senza paypal_order_id"
-                )
+                raise HTTPException(status_code=400, detail="Ordine senza paypal_order_id")
+            
             paypal_order_id = order["paypal_transaction_id"]
 
-        # Autorizza
+        # 1. Autorizza
         auth_id, error = paypal_service.authorize_order(paypal_order_id)
         if error:
             raise HTTPException(status_code=500, detail=f"Errore authorize: {error}")
 
-        # Aggiorna l'ordine
+        # 2. Aggiorna l'ordine e recupera i dati per l'email
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE orders_order
-                SET status = 'authorized',
-                    payment_status = 'authorized',
-                    paypal_authorization_id = %s,
-                    updated = NOW()
+                SET status = 'authorized', payment_status = 'authorized',
+                    paypal_authorization_id = %s, updated = NOW()
                 WHERE id = %s
             """, (auth_id, order_id))
+            
+            cur.execute("""
+                SELECT email, first_name, last_name, order_number, total, 
+                       address, postal_code, city, province 
+                FROM orders_order WHERE id = %s
+            """, (order_id,))
+            order_info = cur.fetchone()
+            
+            cur.execute("SELECT product_name, quantity, price FROM orders_orderitem WHERE order_id = %s", (order_id,))
+            items = cur.fetchall()
+            
         conn.commit()
 
+        # ---> INVIO EMAIL DI CONFERMA (solo ora che è authorized) <---
+        if order_info:
+            subject, body = send_order_confirmation_email(order_info, items)
+            background_tasks.add_task(send_email_smtp, order_info['email'], subject, body)
+
         return {
-            "success": True,
-            "order_id": order_id,
-            "status": "authorized",
-            "paypal_authorization_id": auth_id,
+            "success": True, "order_id": order_id,
+            "status": "authorized", "paypal_authorization_id": auth_id,
         }
     except HTTPException:
         conn.rollback()
         raise
     except Exception as e:
         conn.rollback()
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
     finally:
         conn.close()
