@@ -173,6 +173,7 @@ class OrderListItem(BaseModel):
     created: str
     item_count: int
 
+
 class AdminShipRequest(BaseModel):
     tracking_number: str = ""
 
@@ -382,6 +383,7 @@ def get_cart(current_user: dict = Depends(get_current_user)):
     finally:
         conn.close()
 # api/main.py — SOSTITUISCI add_to_cart
+
 
 @app.post("/api/v1/cart/add")
 def add_to_cart(
@@ -694,6 +696,7 @@ class TokenResponse(BaseModel):
     username: str
 
 # api/main.py — AGGIUNGI gli endpoint di autenticazione
+
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
 def login(credentials: UserLogin):
@@ -1618,6 +1621,7 @@ def admin_list_orders(
     finally:
         conn.close()
 
+
 @app.post("/api/v1/admin/orders/{order_id}/ship")
 def admin_ship_order(
     order_id: int,
@@ -1781,6 +1785,7 @@ def admin_cancel_order(
     finally:
         conn.close()
 
+
 @app.get("/api/v1/payment/paypal/config")
 def paypal_config():
     """Restituisce la configurazione PayPal per il frontend."""
@@ -1827,6 +1832,7 @@ def paypal_client_token():
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
+
 
 class PayPalCardOrderRequest(BaseModel):
     order_id: int
@@ -1911,6 +1917,7 @@ def paypal_card_order(
     finally:
         conn.close()
 
+
 @app.get("/api/v1/payment/paypal/card-success")
 def paypal_card_success(
     background_tasks: BackgroundTasks,
@@ -1979,6 +1986,7 @@ def paypal_card_success(
         raise HTTPException(status_code=500, detail=f"Errore: {str(e)}")
     finally:
         conn.close()
+
 
 from fastapi.responses import HTMLResponse
 
